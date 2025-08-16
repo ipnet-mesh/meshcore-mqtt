@@ -1,0 +1,72 @@
+name: Code Quality
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  lint:
+    name: Lint and Format Check
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.12"
+
+    - name: Cache pip dependencies
+      uses: actions/cache@v4
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-lint-${{ hashFiles('**/requirements-dev.txt') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-lint-
+
+    - name: Install linting dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install black flake8 mypy isort bandit
+
+    - name: Check code formatting with Black
+      run: |
+        echo "::group::Black formatting check"
+        black --check --diff --color meshcore_mqtt/ tests/
+        echo "::endgroup::"
+
+    - name: Check import sorting with isort
+      run: |
+        echo "::group::Import sorting check"
+        isort --check-only --diff meshcore_mqtt/ tests/
+        echo "::endgroup::"
+
+    - name: Lint with Flake8
+      run: |
+        echo "::group::Flake8 linting"
+        flake8 meshcore_mqtt/ tests/ --statistics
+        echo "::endgroup::"
+
+    - name: Type check with MyPy
+      run: |
+        echo "::group::MyPy type checking"
+        # Install package dependencies for type checking
+        pip install -r requirements-dev.txt
+        mypy meshcore_mqtt/ tests/
+        echo "::endgroup::"
+
+    - name: Security check with Bandit
+      run: |
+        echo "::group::Bandit security scan"
+        bandit -r meshcore_mqtt/ -ll
+        echo "::endgroup::"
+
+    # - name: Dependency security check with Safety
+    #   run: |
+    #     echo "::group::Safety dependency check"
+    #     pip install -r requirements.txt
+    #     safety check
+    #     echo "::endgroup::"

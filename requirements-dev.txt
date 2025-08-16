@@ -1,0 +1,27 @@
+-r requirements.txt
+
+# Testing
+pytest==8.4.1
+pytest-asyncio==1.1.0
+pytest-cov==6.0.0
+
+# Code Quality
+flake8==7.3.0
+black==25.1.0
+mypy==1.17.1
+isort==5.13.2
+
+# Security
+bandit==1.8.0
+# safety>=3.6.0  # Temporarily disabled due to pydantic version conflict
+
+# Development Tools
+pre-commit==4.2.0
+
+# Type Stubs
+types-PyYAML==6.0.12.20250516
+types-pyserial==3.5.0.20240311
+
+# Build Tools
+build==1.2.2.post1
+twine==6.0.1

@@ -1,0 +1,86 @@
+services:
+  meshcore-mqtt:
+    image: ghcr.io/jinglemansweep/meshcore-mqtt:latest
+    # Alternative: build locally
+    # build: .
+    container_name: meshcore-mqtt-bridge
+    restart: unless-stopped
+
+    # Environment variables configuration
+    environment:
+      # Logging configuration
+      - LOG_LEVEL=INFO
+
+      # MQTT broker configuration
+      - MQTT_BROKER=mqtt-broker
+      - MQTT_PORT=1883
+      - MQTT_USERNAME=meshcore
+      - MQTT_PASSWORD=meshcore123
+      - MQTT_TOPIC_PREFIX=meshcore
+      - MQTT_QOS=1
+      - MQTT_RETAIN=true
+
+      # MeshCore device configuration (serial default)
+      - MESHCORE_CONNECTION=serial
+      - MESHCORE_ADDRESS=/dev/ttyUSB0
+      - MESHCORE_BAUDRATE=115200
+      - MESHCORE_TIMEOUT=30
+
+      # Configurable events (comma-separated)
+      - MESHCORE_EVENTS=CONTACT_MSG_RECV,CHANNEL_MSG_RECV,CONNECTED,DISCONNECTED,LOGIN_SUCCESS,DEVICE_INFO,BATTERY,ADVERTISEMENT
+
+    # Device access for serial communication
+    devices:
+      - "/dev/ttyUSB0:/dev/ttyUSB0"
+
+    # Network configuration
+    networks:
+      - meshcore-network
+
+    # Dependencies
+    depends_on:
+      - mqtt-broker
+
+    # Health check
+    healthcheck:
+      test: ["CMD", "python", "-c", "import meshcore_mqtt; print('Health check passed')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  # Example MQTT broker (Eclipse Mosquitto)
+  mqtt-broker:
+    image: eclipse-mosquitto:2.0-openssl
+    container_name: mqtt-broker
+    restart: unless-stopped
+
+    ports:
+      - "1883:1883"
+      - "9001:9001"
+
+    volumes:
+      - mqtt-config:/mosquitto/config
+      - mqtt-data:/mosquitto/data
+      - mqtt-logs:/mosquitto/log
+
+    networks:
+      - meshcore-network
+
+    # Simple mosquitto config
+    command: |
+      sh -c 'echo "listener 1883
+      allow_anonymous true
+      persistence true
+      persistence_location /mosquitto/data/
+      log_dest file /mosquitto/log/mosquitto.log" > /mosquitto/config/mosquitto.conf &&
+      /usr/sbin/mosquitto -c /mosquitto/config/mosquitto.conf'
+
+volumes:
+  mqtt-config:
+  mqtt-data:
+  mqtt-logs:
+
+networks:
+  meshcore-network:
+    driver: bridge
