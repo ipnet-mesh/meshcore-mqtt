@@ -1,6 +1,6 @@
 services:
   meshcore-mqtt:
-    image: ghcr.io/jinglemansweep/meshcore-mqtt:latest
+    image: ghcr.io/ipnet-mesh/meshcore-mqtt:latest
     # Alternative: build locally
     # build: .
     container_name: meshcore-mqtt-bridge

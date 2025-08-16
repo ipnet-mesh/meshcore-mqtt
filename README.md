@@ -2,10 +2,10 @@
 
 [![License](https://img.shields.io/badge/License-GPL_v3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 [![Python](https://img.shields.io/badge/Python-3.11+-blue.svg)](https://www.python.org/)
-[![CI](https://github.com/jinglemansweep/meshcore-mqtt/actions/workflows/ci.yml/badge.svg)](https://github.com/jinglemansweep/meshcore-mqtt/actions/workflows/ci.yml)
-[![Code Quality](https://github.com/jinglemansweep/meshcore-mqtt/actions/workflows/code-quality.yml/badge.svg)](https://github.com/jinglemansweep/meshcore-mqtt/actions/workflows/code-quality.yml)
-[![Tests](https://github.com/jinglemansweep/meshcore-mqtt/actions/workflows/test.yml/badge.svg)](https://github.com/jinglemansweep/meshcore-mqtt/actions/workflows/test.yml)
-[![Docker Build and Push](https://github.com/jinglemansweep/meshcore-mqtt/actions/workflows/docker-build.yml/badge.svg)](https://github.com/jinglemansweep/meshcore-mqtt/actions/workflows/docker-build.yml)
+[![CI](https://github.com/ipnet-mesh/meshcore-mqtt/actions/workflows/ci.yml/badge.svg)](https://github.com/ipnet-mesh/meshcore-mqtt/actions/workflows/ci.yml)
+[![Code Quality](https://github.com/ipnet-mesh/meshcore-mqtt/actions/workflows/code-quality.yml/badge.svg)](https://github.com/ipnet-mesh/meshcore-mqtt/actions/workflows/code-quality.yml)
+[![Tests](https://github.com/ipnet-mesh/meshcore-mqtt/actions/workflows/test.yml/badge.svg)](https://github.com/ipnet-mesh/meshcore-mqtt/actions/workflows/test.yml)
+[![Docker Build and Push](https://github.com/ipnet-mesh/meshcore-mqtt/actions/workflows/docker-build.yml/badge.svg)](https://github.com/ipnet-mesh/meshcore-mqtt/actions/workflows/docker-build.yml)
 [![Code style: black](https://img.shields.io/badge/Code%20style-black-000000.svg)](https://github.com/psf/black)
 [![Typing: mypy](https://img.shields.io/badge/Typing-mypy-blue.svg)](https://mypy.readthedocs.io/)
 [![Security: bandit](https://img.shields.io/badge/Security-bandit-yellow.svg)](https://github.com/PyCQA/bandit)
@@ -427,7 +427,7 @@ Pre-built Docker images are available from GitHub Container Registry:
 
 ```bash
 # Pull the latest image
-docker pull ghcr.io/jinglemansweep/meshcore-mqtt:latest
+docker pull ghcr.io/ipnet-mesh/meshcore-mqtt:latest
 
 # Run with serial connection (default for MeshCore devices)
 docker run -d \
@@ -439,7 +439,7 @@ docker run -d \
   -e MQTT_PASSWORD=meshcore123 \
   -e MESHCORE_CONNECTION=serial \
   -e MESHCORE_ADDRESS=/dev/ttyUSB0 \
-  ghcr.io/jinglemansweep/meshcore-mqtt:latest
+  ghcr.io/ipnet-mesh/meshcore-mqtt:latest
 ```
 
 #### Building Locally
@@ -474,7 +474,7 @@ docker run -d \
   --restart unless-stopped \
   --device=/dev/ttyUSB0:/dev/ttyUSB0 \
   --env-file .env.docker \
-  ghcr.io/jinglemansweep/meshcore-mqtt:latest
+  ghcr.io/ipnet-mesh/meshcore-mqtt:latest
 ```
 
 #### Option 3: Using Docker Compose
