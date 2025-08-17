@@ -219,17 +219,6 @@ class MeshCoreWorker:
         self.logger.info("Setting up MeshCore event subscriptions")
         configured_events = set(self.config.meshcore.events)
 
-        # Always subscribe to NO_MORE_MSGS to restart auto-fetching
-        if self.meshcore:
-            try:
-                no_more_msgs_event = getattr(EventType, "NO_MORE_MSGS")
-                self.meshcore.subscribe(no_more_msgs_event, self._on_no_more_msgs)
-                self.logger.info(
-                    "Subscribed to NO_MORE_MSGS event for auto-fetch restart"
-                )
-            except AttributeError:
-                self.logger.warning("NO_MORE_MSGS event type not available")
-
         # Subscribe to configured events
         if self.meshcore:
             for event_name in configured_events:
@@ -239,6 +228,16 @@ class MeshCoreWorker:
                     self.logger.info(f"Subscribed to event: {event_name}")
                 except AttributeError:
                     self.logger.warning(f"Unknown event type: {event_name}")
+
+            # Always subscribe to NO_MORE_MSGS for auto-fetch management
+            try:
+                no_more_msgs_event = getattr(EventType, "NO_MORE_MSGS")
+                self.meshcore.subscribe(no_more_msgs_event, self._on_meshcore_event)
+                self.logger.info(
+                    "Subscribed to NO_MORE_MSGS event for auto-fetch management"
+                )
+            except AttributeError:
+                self.logger.warning("NO_MORE_MSGS event type not available")
 
     async def _message_processor(self) -> None:
         """Process messages from the inbox."""
@@ -585,6 +584,13 @@ class MeshCoreWorker:
                 str(event_type_name).split(".")[-1] if event_type_name else "UNKNOWN"
             )
 
+            # Handle NO_MORE_MSGS for auto-fetch management
+            if event_name == "NO_MORE_MSGS":
+                self.logger.debug(f"Received NO_MORE_MSGS event: {event_data}")
+                self._auto_fetch_running = False
+                # Don't forward NO_MORE_MSGS to MQTT as it's internal
+                return
+
             # Add extra logging for connection events to help debug
             if event_name in ["CONNECTED", "DISCONNECTED"]:
                 self.logger.info(f"MeshCore {event_name} event received: {event_data}")
@@ -602,12 +608,6 @@ class MeshCoreWorker:
 
         except Exception as e:
             self.logger.error(f"Error processing MeshCore event: {e}")
-
-    def _on_no_more_msgs(self, event_data: Any) -> None:
-        """Handle NO_MORE_MSGS events."""
-        self.logger.debug(f"Received NO_MORE_MSGS event: {event_data}")
-        self._auto_fetch_running = False
-        self.update_activity()
 
     async def _send_status_update(self, status: ComponentStatus, details: str) -> None:
         """Send status update to other components."""
