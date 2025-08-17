@@ -73,14 +73,15 @@ The bridge supports configurable event subscriptions:
 - `CONNECTED`, `DISCONNECTED` (connection status)
 - `LOGIN_SUCCESS`, `LOGIN_FAILED` (authentication)
 - `DEVICE_INFO`, `BATTERY`, `NEW_CONTACT` (device info)
-- `MESSAGES_WAITING` (notifications)
+- `ADVERTISEMENT`, `TRACE_DATA` (network diagnostics)
 
 **Additional Events**:
-- `ADVERTISEMENT`, `TELEMETRY`, `POSITION`
+- `TELEMETRY`, `POSITION`
 - `ROUTING`, `ADMIN`, `USER`
 - `TEXT_MESSAGE_RX`, `TEXT_MESSAGE_TX`
-- `WAYPOINT`, `NEIGHBOR_INFO`, `TRACEROUTE`
+- `WAYPOINT`, `NEIGHBOR_INFO`
 - `NODE_LIST_CHANGED`, `CONFIG_CHANGED`
+- `MESSAGES_WAITING` (notifications)
 
 ### Auto-Fetch Restart Feature
 
@@ -130,6 +131,7 @@ The bridge supports bidirectional communication via MQTT commands. Send commands
 | `set_name` | Set device name | `name` | `meshcore.commands.set_name()` |
 | `ping` | Ping a node | `destination` | `meshcore.commands.ping()` |
 | `send_advert` | Send device advertisement | None (optional: `flood`) | `meshcore.commands.send_advert()` |
+| `send_trace` | Send trace packet for routing diagnostics | None (optional: `auth_code`, `tag`, `flags`, `path`) | `meshcore.commands.send_trace()` |
 
 **Command Examples**:
 ```json
@@ -156,6 +158,12 @@ The bridge supports bidirectional communication via MQTT commands. Send commands
 
 // Send advertisement with flood
 {"flood": true}
+
+// Send trace packet (basic)
+{}
+
+// Send trace packet with parameters
+{"auth_code": 12345, "tag": 67890, "flags": 1, "path": "23,5f,3a"}
 ```
 
 **Command Examples**:
@@ -188,6 +196,13 @@ mosquitto_pub -h localhost -t "meshcore/command/send_advert" -m '{}'
 # Send device advertisement with flood
 mosquitto_pub -h localhost -t "meshcore/command/send_advert" \
   -m '{"flood": true}'
+
+# Send trace packet (basic)
+mosquitto_pub -h localhost -t "meshcore/command/send_trace" -m '{}'
+
+# Send trace packet with routing path
+mosquitto_pub -h localhost -t "meshcore/command/send_trace" \
+  -m '{"auth_code": 12345, "path": "23,5f,3a"}'
 ```
 
 ## Development Guidelines

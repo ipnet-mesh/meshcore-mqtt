@@ -91,6 +91,7 @@ class MeshCoreConfig(BaseModel):
             "BATTERY",
             "NEW_CONTACT",
             "ADVERTISEMENT",
+            "TRACE_DATA",
         ],
         description="List of MeshCore event types to subscribe to",
     )
@@ -142,6 +143,7 @@ class MeshCoreConfig(BaseModel):
             "WAYPOINT",
             "NEIGHBOR_INFO",
             "TRACEROUTE",
+            "TRACE_DATA",
             "ADVERTISEMENT",
         }
 

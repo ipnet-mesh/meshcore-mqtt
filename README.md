@@ -221,10 +221,11 @@ If no events are specified, the bridge subscribes to these default events:
 - `DISCONNECTED` - Device disconnection events
 - `LOGIN_SUCCESS` - Successful authentication
 - `LOGIN_FAILED` - Failed authentication
-- `MESSAGES_WAITING` - Pending messages notification
 - `DEVICE_INFO` - Device information updates
 - `BATTERY` - Battery status updates
 - `NEW_CONTACT` - New contact discovered
+- `ADVERTISEMENT` - Device advertisement broadcasts
+- `TRACE_DATA` - Network trace information
 
 ### Additional Supported Events
 You can also subscribe to these additional event types:
@@ -237,10 +238,9 @@ You can also subscribe to these additional event types:
 - `TEXT_MESSAGE_TX` - Text messages transmitted
 - `WAYPOINT` - Waypoint data
 - `NEIGHBOR_INFO` - Neighbor node information
-- `TRACEROUTE` - Network trace information
 - `NODE_LIST_CHANGED` - Node list updates
 - `CONFIG_CHANGED` - Configuration changes
-- `ADVERTISEMENT` - Device advertisement broadcasts
+- `MESSAGES_WAITING` - Pending messages notification
 
 ### Configuration Examples
 
@@ -341,6 +341,14 @@ Send commands to MeshCore devices via MQTT using `{prefix}/command/{command_type
   ```json
   {"destination": "node_id"}
   ```
+- `{prefix}/command/send_trace` - Send trace packet for routing diagnostics
+  ```json
+  // Basic trace
+  {}
+
+  // Trace with specific routing path through repeaters
+  {"auth_code": 12345, "path": "23,5f,3a", "flags": 1}
+  ```
 
 ### MQTT Command Examples
 
@@ -372,6 +380,13 @@ mosquitto_pub -h localhost -t "meshcore/command/send_advert" -m '{}'
 # Send device advertisement with flood
 mosquitto_pub -h localhost -t "meshcore/command/send_advert" \
   -m '{"flood": true}'
+
+# Send trace packet (basic routing diagnostics)
+mosquitto_pub -h localhost -t "meshcore/command/send_trace" -m '{}'
+
+# Send trace packet with routing path through specific repeaters
+mosquitto_pub -h localhost -t "meshcore/command/send_trace" \
+  -m '{"auth_code": 12345, "path": "23,5f,3a"}'
 ```
 
 ### Available MeshCore Commands
@@ -387,6 +402,7 @@ The bridge supports these MeshCore commands via MQTT:
 | `set_name` | Set device name | `name` | `{"name": "MyDevice"}` |
 | `ping` | Ping a node | `destination` | `{"destination": "node123"}` |
 | `send_advert` | Send device advertisement | None (optional: `flood`) | `{}` or `{"flood": true}` |
+| `send_trace` | Send trace packet for routing diagnostics | None (optional: `auth_code`, `tag`, `flags`, `path`) | `{}` or `{"auth_code": 12345, "path": "23,5f,3a"}` |
 
 ### Topic Examples
 - `meshcore/message/channel/0` - Channel 0 messages
@@ -396,8 +412,10 @@ The bridge supports these MeshCore commands via MQTT:
 - `meshcore/battery` - Battery level updates
 - `meshcore/device_info` - Device specifications and capabilities
 - `meshcore/advertisement` - Device advertisement broadcasts
+- `meshcore/traceroute` - Network trace responses
 - `meshcore/command/send_msg` - Send message command (subscribed)
 - `meshcore/command/ping` - Ping command (subscribed)
+- `meshcore/command/send_trace` - Send trace packet command (subscribed)
 
 ## Docker Deployment
 

@@ -372,6 +372,8 @@ class MQTTWorker:
                     return f"{self.config.mqtt.topic_prefix}/new_contact"
                 elif event_name == "ADVERTISEMENT":
                     return f"{self.config.mqtt.topic_prefix}/advertisement"
+                elif event_name == "TRACE_DATA":
+                    return f"{self.config.mqtt.topic_prefix}/traceroute"
 
             # Fallback for unknown event types
             return f"{self.config.mqtt.topic_prefix}/event"

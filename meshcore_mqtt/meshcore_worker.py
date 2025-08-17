@@ -334,6 +334,15 @@ class MeshCoreWorker:
                 flood = command_data.get("flood", False)
                 result = await self.meshcore.commands.send_advert(flood=flood)
 
+            elif command_type == "send_trace":
+                auth_code = command_data.get("auth_code", 0)
+                tag = command_data.get("tag")  # Optional, will be auto-generated
+                flags = command_data.get("flags", 0)
+                path = command_data.get("path")  # Optional path specification
+                result = await self.meshcore.commands.send_trace(
+                    auth_code=auth_code, tag=tag, flags=flags, path=path
+                )
+
             else:
                 self.logger.warning(f"Unknown command type: {command_type}")
                 return

@@ -31,6 +31,7 @@ class TestConfigurableEvents:
             "BATTERY",
             "NEW_CONTACT",
             "ADVERTISEMENT",
+            "TRACE_DATA",
         ]
 
         assert config.events == expected_events
@@ -223,6 +224,7 @@ class TestConfigurableEvents:
             "BATTERY",
             "NEW_CONTACT",
             "ADVERTISEMENT",
+            "TRACE_DATA",
         ]
         assert config.meshcore.events == expected_events
 
