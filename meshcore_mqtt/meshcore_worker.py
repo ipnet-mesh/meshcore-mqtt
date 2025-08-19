@@ -323,13 +323,6 @@ class MeshCoreWorker:
                     return
                 result = await self.meshcore.commands.send_chan_msg(channel, msg_text)
 
-            elif command_type == "ping":
-                destination = command_data.get("destination")
-                if not destination:
-                    self.logger.error("ping requires 'destination' field")
-                    return
-                result = await self.meshcore.commands.ping(destination)
-
             elif command_type == "send_advert":
                 flood = command_data.get("flood", False)
                 result = await self.meshcore.commands.send_advert(flood=flood)

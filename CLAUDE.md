@@ -126,7 +126,6 @@ The bridge supports bidirectional communication via MQTT commands. Send commands
 | `device_query` | Query device information | None | `meshcore.commands.send_device_query()` |
 | `get_battery` | Get battery status | None | `meshcore.commands.get_bat()` |
 | `set_name` | Set device name | `name` | `meshcore.commands.set_name()` |
-| `ping` | Ping a node | `destination` | `meshcore.commands.ping()` |
 | `send_advert` | Send device advertisement | None (optional: `flood`) | `meshcore.commands.send_advert()` |
 | `send_trace` | Send trace packet for routing diagnostics | None (optional: `auth_code`, `tag`, `flags`, `path`) | `meshcore.commands.send_trace()` |
 | `send_telemetry_req` | Request telemetry data from a node | `destination` | `meshcore.commands.send_telemetry_req()` |
@@ -147,9 +146,6 @@ The bridge supports bidirectional communication via MQTT commands. Send commands
 
 // Set device name
 {"name": "MyDevice"}
-
-// Ping node
-{"destination": "node_id"}
 
 // Send advertisement
 {}
@@ -173,10 +169,6 @@ mosquitto_pub -h localhost -t "meshcore/command/send_msg" \
 # Send channel message
 mosquitto_pub -h localhost -t "meshcore/command/send_chan_msg" \
   -m '{"channel": 0, "message": "Hello everyone on channel 0!"}'
-
-# Ping a node
-mosquitto_pub -h localhost -t "meshcore/command/ping" \
-  -m '{"destination": "node123"}'
 
 # Get device info
 mosquitto_pub -h localhost -t "meshcore/command/device_query" -m '{}'

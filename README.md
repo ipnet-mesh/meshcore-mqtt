@@ -363,10 +363,6 @@ mosquitto_pub -h localhost -t "meshcore/command/send_msg" \
 mosquitto_pub -h localhost -t "meshcore/command/send_chan_msg" \
   -m '{"channel": 0, "message": "Hello everyone on channel 0!"}'
 
-# Ping a node
-mosquitto_pub -h localhost -t "meshcore/command/ping" \
-  -m '{"destination": "node123"}'
-
 # Get device information
 mosquitto_pub -h localhost -t "meshcore/command/device_query" -m '{}'
 
@@ -414,7 +410,6 @@ The bridge supports these MeshCore commands via MQTT:
 | `device_query` | Query device information | None | `{}` |
 | `get_battery` | Get battery status | None | `{}` |
 | `set_name` | Set device name | `name` | `{"name": "MyDevice"}` |
-| `ping` | Ping a node | `destination` | `{"destination": "node123"}` |
 | `send_advert` | Send device advertisement | None (optional: `flood`) | `{}` or `{"flood": true}` |
 | `send_trace` | Send trace packet for routing diagnostics | None (optional: `auth_code`, `tag`, `flags`, `path`) | `{}` or `{"auth_code": 12345, "path": "23,5f,3a"}` |
 | `send_telemetry_req` | Request telemetry data from a node | `destination` | `{"destination": "node123"}` |
