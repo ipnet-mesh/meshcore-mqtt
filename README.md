@@ -223,7 +223,6 @@ If no events are specified, the bridge subscribes to these default events:
 - `ADVERTISEMENT` - Device advertisement broadcasts
 - `TRACE_DATA` - Network trace information
 - `TELEMETRY_RESPONSE` - Telemetry data responses
-- `SELF_INFO` - Own device information
 - `CHANNEL_INFO` - Channel configuration details
 
 ### Additional Supported Events
@@ -234,6 +233,7 @@ You can also subscribe to these additional event types:
 - `LOGIN_FAILED` - Failed authentication
 - `MESSAGES_WAITING` - Pending messages notification
 - `CONTACTS` - Contact list updates
+- `SELF_INFO` - Own device information
 
 ### Configuration Examples
 
@@ -384,6 +384,10 @@ mosquitto_pub -h localhost -t "meshcore/command/send_advert" \
 # Send trace packet (basic routing diagnostics)
 mosquitto_pub -h localhost -t "meshcore/command/send_trace" -m '{}'
 
+# Request telemetry data from a node
+mosquitto_pub -h localhost -t "meshcore/command/send_telemetry_req" \
+  -m '{"destination": "node123"}'
+
 # Send trace packet with routing path through specific repeaters
 mosquitto_pub -h localhost -t "meshcore/command/send_trace" \
   -m '{"auth_code": 12345, "path": "23,5f,3a"}'
@@ -413,6 +417,7 @@ The bridge supports these MeshCore commands via MQTT:
 | `ping` | Ping a node | `destination` | `{"destination": "node123"}` |
 | `send_advert` | Send device advertisement | None (optional: `flood`) | `{}` or `{"flood": true}` |
 | `send_trace` | Send trace packet for routing diagnostics | None (optional: `auth_code`, `tag`, `flags`, `path`) | `{}` or `{"auth_code": 12345, "path": "23,5f,3a"}` |
+| `send_telemetry_req` | Request telemetry data from a node | `destination` | `{"destination": "node123"}` |
 
 ### Topic Examples
 - `meshcore/message/channel/0` - Channel 0 messages

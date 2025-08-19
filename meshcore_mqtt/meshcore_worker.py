@@ -343,6 +343,13 @@ class MeshCoreWorker:
                     auth_code=auth_code, tag=tag, flags=flags, path=path
                 )
 
+            elif command_type == "send_telemetry_req":
+                destination = command_data.get("destination")
+                if not destination:
+                    self.logger.error("send_telemetry_req requires 'destination' field")
+                    return
+                result = await self.meshcore.commands.send_telemetry_req(destination)
+
             else:
                 self.logger.warning(f"Unknown command type: {command_type}")
                 return

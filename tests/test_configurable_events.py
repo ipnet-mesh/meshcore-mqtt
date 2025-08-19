@@ -29,7 +29,6 @@ class TestConfigurableEvents:
             "ADVERTISEMENT",
             "TRACE_DATA",
             "TELEMETRY_RESPONSE",
-            "SELF_INFO",
             "CHANNEL_INFO",
         ]
 
@@ -214,7 +213,6 @@ class TestConfigurableEvents:
             "ADVERTISEMENT",
             "TRACE_DATA",
             "TELEMETRY_RESPONSE",
-            "SELF_INFO",
             "CHANNEL_INFO",
         ]
         assert config.meshcore.events == expected_events

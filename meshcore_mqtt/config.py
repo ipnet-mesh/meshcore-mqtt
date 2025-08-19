@@ -89,7 +89,6 @@ class MeshCoreConfig(BaseModel):
             "ADVERTISEMENT",
             "TRACE_DATA",
             "TELEMETRY_RESPONSE",
-            "SELF_INFO",
             "CHANNEL_INFO",
         ],
         description="List of MeshCore event types to subscribe to",

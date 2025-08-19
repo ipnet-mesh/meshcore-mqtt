@@ -72,13 +72,13 @@ The bridge supports configurable event subscriptions:
 - `CONTACT_MSG_RECV`, `CHANNEL_MSG_RECV` (messages)
 - `DEVICE_INFO`, `BATTERY`, `NEW_CONTACT` (device info)
 - `ADVERTISEMENT`, `TRACE_DATA` (network diagnostics)
-- `TELEMETRY_RESPONSE`, `SELF_INFO`, `CHANNEL_INFO` (device details)
+- `TELEMETRY_RESPONSE`, `CHANNEL_INFO` (device details)
 
 **Additional Events**:
 - `CONNECTED`, `DISCONNECTED` (connection status, can be noisy)
 - `LOGIN_SUCCESS`, `LOGIN_FAILED` (authentication)
 - `MESSAGES_WAITING` (notifications)
-- `CONTACTS` (contact list updates)
+- `CONTACTS`, `SELF_INFO` (contact and device information)
 
 ### Auto-Fetch Restart Feature
 
@@ -129,6 +129,7 @@ The bridge supports bidirectional communication via MQTT commands. Send commands
 | `ping` | Ping a node | `destination` | `meshcore.commands.ping()` |
 | `send_advert` | Send device advertisement | None (optional: `flood`) | `meshcore.commands.send_advert()` |
 | `send_trace` | Send trace packet for routing diagnostics | None (optional: `auth_code`, `tag`, `flags`, `path`) | `meshcore.commands.send_trace()` |
+| `send_telemetry_req` | Request telemetry data from a node | `destination` | `meshcore.commands.send_telemetry_req()` |
 
 **Command Examples**:
 ```json
@@ -200,6 +201,10 @@ mosquitto_pub -h localhost -t "meshcore/command/send_trace" -m '{}'
 # Send trace packet with routing path
 mosquitto_pub -h localhost -t "meshcore/command/send_trace" \
   -m '{"auth_code": 12345, "path": "23,5f,3a"}'
+
+# Request telemetry data from a node
+mosquitto_pub -h localhost -t "meshcore/command/send_telemetry_req" \
+  -m '{"destination": "node123"}'
 ```
 
 ## Development Guidelines
