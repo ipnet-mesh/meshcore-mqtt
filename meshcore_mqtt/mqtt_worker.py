@@ -373,7 +373,13 @@ class MQTTWorker:
                 elif event_name == "ADVERTISEMENT":
                     return f"{self.config.mqtt.topic_prefix}/advertisement"
                 elif event_name == "TRACE_DATA":
-                    return f"{self.config.mqtt.topic_prefix}/traceroute"
+                    # Extract tag from trace data for topic path
+                    trace_tag = "unknown"
+                    if hasattr(event_data, "payload") and event_data.payload:
+                        trace_tag = event_data.payload.get("tag", "unknown")
+                    elif hasattr(event_data, "attributes") and event_data.attributes:
+                        trace_tag = event_data.attributes.get("tag", "unknown")
+                    return f"{self.config.mqtt.topic_prefix}/traceroute/{trace_tag}"
 
             # Fallback for unknown event types
             return f"{self.config.mqtt.topic_prefix}/event"

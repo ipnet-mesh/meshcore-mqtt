@@ -217,8 +217,6 @@ The bridge can subscribe to various MeshCore event types. You can configure whic
 If no events are specified, the bridge subscribes to these default events:
 - `CONTACT_MSG_RECV` - Contact messages received
 - `CHANNEL_MSG_RECV` - Channel messages received
-- `CONNECTED` - Device connection events
-- `DISCONNECTED` - Device disconnection events
 - `LOGIN_SUCCESS` - Successful authentication
 - `LOGIN_FAILED` - Failed authentication
 - `DEVICE_INFO` - Device information updates
@@ -229,6 +227,8 @@ If no events are specified, the bridge subscribes to these default events:
 
 ### Additional Supported Events
 You can also subscribe to these additional event types:
+- `CONNECTED` - Device connection events (can be noisy)
+- `DISCONNECTED` - Device disconnection events (can be noisy)
 - `TELEMETRY` - Telemetry data
 - `POSITION` - Position/GPS updates
 - `USER` - User-related events
@@ -297,9 +297,14 @@ The bridge publishes to these topics based on configured MeshCore events:
 - Subscribe to all direct messages: `{prefix}/message/direct/+`
 - Subscribe to messages from specific node: `{prefix}/message/direct/{specific_pubkey_prefix}`
 
+**Trace Topic Subscription Patterns:**
+- Subscribe to all trace responses: `{prefix}/traceroute/+`
+- Subscribe to specific trace tag: `{prefix}/traceroute/12345`
+
 Where:
 - `{channel_idx}` is the numeric channel identifier (e.g., 0, 1, 2)
 - `{pubkey_prefix}` is the sender's 6-byte public key prefix (hex encoded, e.g., `a1b2c3d4e5f6`)
+- `{tag}` is the trace identifier (32-bit integer, e.g., 12345)
 
 **Other Published Topics:**
 - `{prefix}/login` - Authentication status from LOGIN_SUCCESS/LOGIN_FAILED events
@@ -387,6 +392,16 @@ mosquitto_pub -h localhost -t "meshcore/command/send_trace" -m '{}'
 # Send trace packet with routing path through specific repeaters
 mosquitto_pub -h localhost -t "meshcore/command/send_trace" \
   -m '{"auth_code": 12345, "path": "23,5f,3a"}'
+
+# Send trace with specific tag for tracking responses
+mosquitto_pub -h localhost -t "meshcore/command/send_trace" \
+  -m '{"tag": 67890, "path": "a0,b1,c2"}'
+
+# Subscribe to all trace responses
+mosquitto_sub -h localhost -t "meshcore/traceroute/+"
+
+# Subscribe to specific trace tag responses
+mosquitto_sub -h localhost -t "meshcore/traceroute/67890"
 ```
 
 ### Available MeshCore Commands
@@ -412,7 +427,7 @@ The bridge supports these MeshCore commands via MQTT:
 - `meshcore/battery` - Battery level updates
 - `meshcore/device_info` - Device specifications and capabilities
 - `meshcore/advertisement` - Device advertisement broadcasts
-- `meshcore/traceroute` - Network trace responses
+- `meshcore/traceroute/{tag}` - Network trace responses (tag-specific)
 - `meshcore/command/send_msg` - Send message command (subscribed)
 - `meshcore/command/ping` - Ping command (subscribed)
 - `meshcore/command/send_trace` - Send trace packet command (subscribed)

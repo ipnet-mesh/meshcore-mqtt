@@ -70,12 +70,12 @@ The bridge supports configurable event subscriptions:
 
 **Default Events**:
 - `CONTACT_MSG_RECV`, `CHANNEL_MSG_RECV` (messages)
-- `CONNECTED`, `DISCONNECTED` (connection status)
 - `LOGIN_SUCCESS`, `LOGIN_FAILED` (authentication)
 - `DEVICE_INFO`, `BATTERY`, `NEW_CONTACT` (device info)
 - `ADVERTISEMENT`, `TRACE_DATA` (network diagnostics)
 
 **Additional Events**:
+- `CONNECTED`, `DISCONNECTED` (connection status, can be noisy)
 - `TELEMETRY`, `POSITION`
 - `ROUTING`, `ADMIN`, `USER`
 - `TEXT_MESSAGE_RX`, `TEXT_MESSAGE_TX`

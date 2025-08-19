@@ -23,8 +23,6 @@ class TestConfigurableEvents:
         expected_events = [
             "CONTACT_MSG_RECV",
             "CHANNEL_MSG_RECV",
-            "CONNECTED",
-            "DISCONNECTED",
             "LOGIN_SUCCESS",
             "LOGIN_FAILED",
             "DEVICE_INFO",
@@ -54,8 +52,6 @@ class TestConfigurableEvents:
         valid_events = [
             "CONTACT_MSG_RECV",
             "CHANNEL_MSG_RECV",
-            "CONNECTED",
-            "DISCONNECTED",
             "LOGIN_SUCCESS",
             "LOGIN_FAILED",
             "MESSAGES_WAITING",
@@ -216,8 +212,6 @@ class TestConfigurableEvents:
         expected_events = [
             "CONTACT_MSG_RECV",
             "CHANNEL_MSG_RECV",
-            "CONNECTED",
-            "DISCONNECTED",
             "LOGIN_SUCCESS",
             "LOGIN_FAILED",
             "DEVICE_INFO",

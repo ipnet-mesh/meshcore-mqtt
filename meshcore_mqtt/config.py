@@ -83,8 +83,6 @@ class MeshCoreConfig(BaseModel):
         default=[
             "CONTACT_MSG_RECV",
             "CHANNEL_MSG_RECV",
-            "CONNECTED",
-            "DISCONNECTED",
             "LOGIN_SUCCESS",
             "LOGIN_FAILED",
             "DEVICE_INFO",
