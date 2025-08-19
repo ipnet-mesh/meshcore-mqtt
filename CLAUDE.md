@@ -70,18 +70,15 @@ The bridge supports configurable event subscriptions:
 
 **Default Events**:
 - `CONTACT_MSG_RECV`, `CHANNEL_MSG_RECV` (messages)
-- `LOGIN_SUCCESS`, `LOGIN_FAILED` (authentication)
 - `DEVICE_INFO`, `BATTERY`, `NEW_CONTACT` (device info)
 - `ADVERTISEMENT`, `TRACE_DATA` (network diagnostics)
+- `TELEMETRY_RESPONSE`, `SELF_INFO`, `CHANNEL_INFO` (device details)
 
 **Additional Events**:
 - `CONNECTED`, `DISCONNECTED` (connection status, can be noisy)
-- `TELEMETRY`, `POSITION`
-- `ROUTING`, `ADMIN`, `USER`
-- `TEXT_MESSAGE_RX`, `TEXT_MESSAGE_TX`
-- `WAYPOINT`, `NEIGHBOR_INFO`
-- `NODE_LIST_CHANGED`, `CONFIG_CHANGED`
+- `LOGIN_SUCCESS`, `LOGIN_FAILED` (authentication)
 - `MESSAGES_WAITING` (notifications)
+- `CONTACTS` (contact list updates)
 
 ### Auto-Fetch Restart Feature
 

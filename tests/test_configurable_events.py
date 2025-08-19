@@ -23,13 +23,14 @@ class TestConfigurableEvents:
         expected_events = [
             "CONTACT_MSG_RECV",
             "CHANNEL_MSG_RECV",
-            "LOGIN_SUCCESS",
-            "LOGIN_FAILED",
             "DEVICE_INFO",
             "BATTERY",
             "NEW_CONTACT",
             "ADVERTISEMENT",
             "TRACE_DATA",
+            "TELEMETRY_RESPONSE",
+            "SELF_INFO",
+            "CHANNEL_INFO",
         ]
 
         assert config.events == expected_events
@@ -58,13 +59,8 @@ class TestConfigurableEvents:
             "DEVICE_INFO",
             "BATTERY",
             "NEW_CONTACT",
-            "NODE_LIST_CHANGED",
-            "CONFIG_CHANGED",
-            "TELEMETRY",
-            "POSITION",
-            "USER",
-            "ROUTING",
-            "ADMIN",
+            "TRACE_DATA",
+            "ADVERTISEMENT",
         ]
 
         config = MeshCoreConfig(
@@ -212,13 +208,14 @@ class TestConfigurableEvents:
         expected_events = [
             "CONTACT_MSG_RECV",
             "CHANNEL_MSG_RECV",
-            "LOGIN_SUCCESS",
-            "LOGIN_FAILED",
             "DEVICE_INFO",
             "BATTERY",
             "NEW_CONTACT",
             "ADVERTISEMENT",
             "TRACE_DATA",
+            "TELEMETRY_RESPONSE",
+            "SELF_INFO",
+            "CHANNEL_INFO",
         ]
         assert config.meshcore.events == expected_events
 

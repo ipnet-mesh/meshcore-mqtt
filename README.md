@@ -217,30 +217,23 @@ The bridge can subscribe to various MeshCore event types. You can configure whic
 If no events are specified, the bridge subscribes to these default events:
 - `CONTACT_MSG_RECV` - Contact messages received
 - `CHANNEL_MSG_RECV` - Channel messages received
-- `LOGIN_SUCCESS` - Successful authentication
-- `LOGIN_FAILED` - Failed authentication
 - `DEVICE_INFO` - Device information updates
 - `BATTERY` - Battery status updates
 - `NEW_CONTACT` - New contact discovered
 - `ADVERTISEMENT` - Device advertisement broadcasts
 - `TRACE_DATA` - Network trace information
+- `TELEMETRY_RESPONSE` - Telemetry data responses
+- `SELF_INFO` - Own device information
+- `CHANNEL_INFO` - Channel configuration details
 
 ### Additional Supported Events
 You can also subscribe to these additional event types:
 - `CONNECTED` - Device connection events (can be noisy)
 - `DISCONNECTED` - Device disconnection events (can be noisy)
-- `TELEMETRY` - Telemetry data
-- `POSITION` - Position/GPS updates
-- `USER` - User-related events
-- `ROUTING` - Mesh routing events
-- `ADMIN` - Administrative messages
-- `TEXT_MESSAGE_RX` - Text messages received
-- `TEXT_MESSAGE_TX` - Text messages transmitted
-- `WAYPOINT` - Waypoint data
-- `NEIGHBOR_INFO` - Neighbor node information
-- `NODE_LIST_CHANGED` - Node list updates
-- `CONFIG_CHANGED` - Configuration changes
+- `LOGIN_SUCCESS` - Successful authentication
+- `LOGIN_FAILED` - Failed authentication
 - `MESSAGES_WAITING` - Pending messages notification
+- `CONTACTS` - Contact list updates
 
 ### Configuration Examples
 
@@ -270,8 +263,6 @@ meshcore:
     - CHANNEL_MSG_RECV
     - CONNECTED
     - DISCONNECTED
-    - TELEMETRY
-    - POSITION
     - BATTERY
     - DEVICE_INFO
     - ADVERTISEMENT
@@ -312,6 +303,10 @@ Where:
 - `{prefix}/battery` - Battery status from BATTERY events
 - `{prefix}/new_contact` - Contact discovery from NEW_CONTACT events
 - `{prefix}/advertisement` - Device advertisements from ADVERTISEMENT events
+- `{prefix}/telemetry` - Telemetry data from TELEMETRY_RESPONSE events
+- `{prefix}/contacts` - Contact list updates from CONTACTS events
+- `{prefix}/self_info` - Own device information from SELF_INFO events
+- `{prefix}/channel_info` - Channel configuration from CHANNEL_INFO events
 
 ### Command Topics (MQTT → MeshCore)
 Send commands to MeshCore devices via MQTT using `{prefix}/command/{command_type}` with JSON payloads:

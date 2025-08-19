@@ -83,13 +83,14 @@ class MeshCoreConfig(BaseModel):
         default=[
             "CONTACT_MSG_RECV",
             "CHANNEL_MSG_RECV",
-            "LOGIN_SUCCESS",
-            "LOGIN_FAILED",
             "DEVICE_INFO",
             "BATTERY",
             "NEW_CONTACT",
             "ADVERTISEMENT",
             "TRACE_DATA",
+            "TELEMETRY_RESPONSE",
+            "SELF_INFO",
+            "CHANNEL_INFO",
         ],
         description="List of MeshCore event types to subscribe to",
     )
@@ -117,7 +118,7 @@ class MeshCoreConfig(BaseModel):
         # Normalize to uppercase for case-insensitive validation
         normalized_events = [event.upper() for event in v]
 
-        # Common MeshCore event types (based on typical mesh networking events)
+        # Valid MeshCore event types (based on actual EventType enum)
         valid_events = {
             "CONTACT_MSG_RECV",
             "CHANNEL_MSG_RECV",
@@ -129,20 +130,12 @@ class MeshCoreConfig(BaseModel):
             "DEVICE_INFO",
             "BATTERY",
             "NEW_CONTACT",
-            "NODE_LIST_CHANGED",
-            "CONFIG_CHANGED",
-            "TELEMETRY",
-            "POSITION",
-            "USER",
-            "ROUTING",
-            "ADMIN",
-            "TEXT_MESSAGE_RX",
-            "TEXT_MESSAGE_TX",
-            "WAYPOINT",
-            "NEIGHBOR_INFO",
-            "TRACEROUTE",
             "TRACE_DATA",
             "ADVERTISEMENT",
+            "TELEMETRY_RESPONSE",
+            "CONTACTS",
+            "SELF_INFO",
+            "CHANNEL_INFO",
         }
 
         invalid_events = [
