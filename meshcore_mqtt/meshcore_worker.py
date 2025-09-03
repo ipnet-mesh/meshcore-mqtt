@@ -3,7 +3,7 @@
 import asyncio
 import logging
 import time
-from typing import TYPE_CHECKING, Any, Optional
+from typing import TYPE_CHECKING, Any, Dict, Optional
 
 if TYPE_CHECKING:
     import serial
@@ -63,6 +63,11 @@ class MeshCoreWorker:
         self._last_health_check: Optional[float] = None
         self._consecutive_health_failures = 0
         self._max_health_failures = 3
+
+        # Message deduplication
+        self._message_cache: Dict[str, float] = {}
+        self._cache_max_size = 1000
+        self._cache_ttl = 300  # 5 minutes
 
         # Worker state
         self._running = False
@@ -199,6 +204,12 @@ class MeshCoreWorker:
             self.logger.info("Connected to MeshCore device")
             self._connected = True
             self._last_activity = time.time()
+
+            # Clear message deduplication cache on new connection
+            self._message_cache.clear()
+            self.logger.debug(
+                "Cleared message deduplication cache for fresh connection"
+            )
 
             # Send connection status
             await self._send_status_update(ComponentStatus.CONNECTED, "connected")
@@ -379,6 +390,8 @@ class MeshCoreWorker:
                 "connected": self._connected,
                 "last_activity": self._last_activity,
                 "auto_fetch_running": self._auto_fetch_running,
+                "message_cache_size": len(self._message_cache),
+                "message_cache_max_size": self._cache_max_size,
             },
         )
         await self.message_bus.send_message(response)
@@ -582,6 +595,91 @@ class MeshCoreWorker:
             else:
                 self.logger.error("🚨 MeshCore recovery failed permanently")
 
+    def _generate_message_fingerprint(self, event_data: Any) -> str:
+        """Generate a unique fingerprint for message deduplication."""
+        import hashlib
+
+        try:
+            # Create fingerprint based on key message attributes
+            fingerprint_data = []
+
+            # Add event type
+            event_type_name = getattr(event_data, "type", "UNKNOWN")
+            fingerprint_data.append(str(event_type_name))
+
+            # For message events, include message content and metadata
+            if hasattr(event_data, "payload") and isinstance(event_data.payload, dict):
+                payload = event_data.payload
+
+                # Include message text, sender, channel for uniqueness
+                if "text" in payload:
+                    fingerprint_data.append(payload["text"])
+                if "from" in payload:
+                    fingerprint_data.append(payload["from"])
+                if "channel_idx" in payload:
+                    fingerprint_data.append(str(payload["channel_idx"]))
+                if "timestamp" in payload:
+                    fingerprint_data.append(str(payload["timestamp"]))
+                if "msg_id" in payload:
+                    fingerprint_data.append(str(payload["msg_id"]))
+
+            # For other events, include key identifying attributes
+            elif hasattr(event_data, "payload"):
+                fingerprint_data.append(str(event_data.payload))
+
+            # Create hash from combined data
+            combined = "|".join(fingerprint_data)
+            return hashlib.md5(combined.encode()).hexdigest()[:16]
+
+        except Exception as e:
+            self.logger.debug(f"Error generating message fingerprint: {e}")
+            # Fallback: use object string representation
+            return hashlib.md5(str(event_data).encode()).hexdigest()[:16]
+
+    def _is_duplicate_message(self, fingerprint: str) -> bool:
+        """Check if message is a duplicate and update cache."""
+        current_time = time.time()
+
+        # Clean expired entries from cache
+        self._clean_message_cache(current_time)
+
+        # Check if this message was seen recently
+        if fingerprint in self._message_cache:
+            self.logger.debug(f"Duplicate message detected: {fingerprint}")
+            return True
+
+        # Add to cache
+        self._message_cache[fingerprint] = current_time
+
+        # Ensure cache doesn't exceed max size after adding
+        if len(self._message_cache) > self._cache_max_size:
+            sorted_items = sorted(self._message_cache.items(), key=lambda x: x[1])
+            excess_count = len(self._message_cache) - self._cache_max_size
+
+            for key, _ in sorted_items[:excess_count]:
+                del self._message_cache[key]
+
+        return False
+
+    def _clean_message_cache(self, current_time: float) -> None:
+        """Remove expired entries from message cache."""
+        expired_keys = [
+            key
+            for key, timestamp in self._message_cache.items()
+            if current_time - timestamp > self._cache_ttl
+        ]
+
+        for key in expired_keys:
+            del self._message_cache[key]
+
+        # If cache is still too large, remove oldest entries
+        if len(self._message_cache) > self._cache_max_size:
+            sorted_items = sorted(self._message_cache.items(), key=lambda x: x[1])
+            excess_count = len(self._message_cache) - self._cache_max_size
+
+            for key, _ in sorted_items[:excess_count]:
+                del self._message_cache[key]
+
     def _on_meshcore_event(self, event_data: Any) -> None:
         """Handle MeshCore events and forward them to MQTT."""
         try:
@@ -603,6 +701,15 @@ class MeshCoreWorker:
             # Add extra logging for connection events to help debug
             if event_name in ["CONNECTED", "DISCONNECTED"]:
                 self.logger.info(f"MeshCore {event_name} event received: {event_data}")
+
+            # Check for duplicate messages (except for connection events)
+            if event_name not in ["CONNECTED", "DISCONNECTED"]:
+                fingerprint = self._generate_message_fingerprint(event_data)
+                if self._is_duplicate_message(fingerprint):
+                    self.logger.debug(
+                        f"Dropping duplicate {event_name} event: {fingerprint}"
+                    )
+                    return
 
             # Create message for MQTT worker
             message = Message.create(
