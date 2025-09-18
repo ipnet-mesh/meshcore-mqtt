@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any, List, Optional, Union
 
 import yaml
+from meshcore import EventType
 from pydantic import BaseModel, Field, field_validator
 
 
@@ -118,24 +119,7 @@ class MeshCoreConfig(BaseModel):
         normalized_events = [event.upper() for event in v]
 
         # Valid MeshCore event types (based on actual EventType enum)
-        valid_events = {
-            "CONTACT_MSG_RECV",
-            "CHANNEL_MSG_RECV",
-            "CONNECTED",
-            "DISCONNECTED",
-            "LOGIN_SUCCESS",
-            "LOGIN_FAILED",
-            "MESSAGES_WAITING",
-            "DEVICE_INFO",
-            "BATTERY",
-            "NEW_CONTACT",
-            "TRACE_DATA",
-            "ADVERTISEMENT",
-            "TELEMETRY_RESPONSE",
-            "CONTACTS",
-            "SELF_INFO",
-            "CHANNEL_INFO",
-        }
+        valid_events = [e.name for e in EventType]
 
         invalid_events = [
             event for event in normalized_events if event not in valid_events
