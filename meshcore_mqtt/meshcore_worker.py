@@ -73,6 +73,10 @@ class MeshCoreWorker:
         self._pending_acks: Dict[str, asyncio.Event] = {}
         self._ack_results: Dict[str, bool] = {}
 
+        # Command deduplication to prevent restart message re-sending
+        self._startup_time = time.time()
+        self._startup_grace_period = 5.0  # 5 seconds to ignore commands during startup
+
     async def start(self) -> None:
         """Start the MeshCore worker."""
         if self._running:
@@ -292,6 +296,20 @@ class MeshCoreWorker:
         """Handle MQTT command forwarded from MQTT worker."""
         if not self.meshcore:
             self.logger.error("MeshCore not initialized, cannot process command")
+            return
+
+        # Check if this command is received during startup grace period
+        # to prevent processing of stale/retained MQTT messages
+        time_since_startup = time.time() - self._startup_time
+        if time_since_startup < self._startup_grace_period:
+            command_data = message.payload
+            command_type = command_data.get("command_type", "")
+            self.logger.warning(
+                f"Ignoring MQTT command '{command_type}' received during startup "
+                f"grace period ({time_since_startup:.1f}s < "
+                f"{self._startup_grace_period}s). This prevents processing "
+                "stale/retained messages after restart."
+            )
             return
 
         command_data = message.payload
@@ -666,11 +684,15 @@ class MeshCoreWorker:
         for attempt in range(max_retries + 1):
             try:
                 self.logger.info(
-                    f"Sending message to {destination} (attempt {attempt + 1}/{max_retries + 1})"
+                    f"Sending message to {destination} "
+                    f"(attempt {attempt + 1}/{max_retries + 1})"
                 )
 
                 # Send the message
-                result = await self.meshcore.commands.send_msg(destination, message)
+                if self.meshcore:
+                    result = await self.meshcore.commands.send_msg(destination, message)
+                else:
+                    raise RuntimeError("MeshCore not initialized")
 
                 # Check if we got MSG_SENT with expected_ack info
                 if result and hasattr(result, "payload"):
@@ -687,25 +709,31 @@ class MeshCoreWorker:
 
                             if ack_received:
                                 self.logger.info(
-                                    f"Message to {destination} acknowledged successfully"
+                                    f"Message to {destination} acknowledged "
+                                    f"successfully"
                                 )
                                 return result
                             else:
                                 self.logger.warning(
-                                    f"No acknowledgement received for message to {destination}"
+                                    f"No acknowledgement received for message to "
+                                    f"{destination}"
                                 )
 
-                                # If this was the last regular attempt, try path reset if configured
+                                # If this was the last regular attempt, try path reset
+                                # if configured
                                 if attempt == max_retries - 1 and reset_path:
                                     self.logger.info(
-                                        f"Resetting path for {destination} and trying once more"
+                                        f"Resetting path for {destination} and trying "
+                                        f"once more"
                                     )
                                     await self._reset_path(destination)
                                     # Continue to the last attempt with reset path
                                 elif attempt < max_retries:
                                     # Wait before retry with exponential backoff
-                                    delay = base_delay * (2 ** attempt)
-                                    self.logger.info(f"Retrying in {delay:.1f} seconds...")
+                                    delay = base_delay * (2**attempt)
+                                    self.logger.info(
+                                        f"Retrying in {delay:.1f} seconds..."
+                                    )
                                     await asyncio.sleep(delay)
                                 continue
 
@@ -715,15 +743,17 @@ class MeshCoreWorker:
 
             except Exception as e:
                 self.logger.error(
-                    f"Error sending message to {destination} on attempt {attempt + 1}: {e}"
+                    f"Error sending message to {destination} on attempt "
+                    f"{attempt + 1}: {e}"
                 )
                 if attempt < max_retries:
-                    delay = base_delay * (2 ** attempt)
+                    delay = base_delay * (2**attempt)
                     self.logger.info(f"Retrying in {delay:.1f} seconds...")
                     await asyncio.sleep(delay)
 
         self.logger.error(
-            f"Failed to send message to {destination} after {max_retries + 1} attempts"
+            f"Failed to send message to {destination} after "
+            f"{max_retries + 1} attempts"
         )
         return None
 
@@ -735,11 +765,17 @@ class MeshCoreWorker:
         for attempt in range(max_retries + 1):
             try:
                 self.logger.info(
-                    f"Sending message to channel {channel} (attempt {attempt + 1}/{max_retries + 1})"
+                    f"Sending message to channel {channel} "
+                    f"(attempt {attempt + 1}/{max_retries + 1})"
                 )
 
                 # Send the channel message
-                result = await self.meshcore.commands.send_chan_msg(channel, message)
+                if self.meshcore:
+                    result = await self.meshcore.commands.send_chan_msg(
+                        channel, message
+                    )
+                else:
+                    raise RuntimeError("MeshCore not initialized")
 
                 # Check if we got MSG_SENT with expected_ack info
                 if result and hasattr(result, "payload"):
@@ -756,18 +792,22 @@ class MeshCoreWorker:
 
                             if ack_received:
                                 self.logger.info(
-                                    f"Channel {channel} message acknowledged successfully"
+                                    f"Channel {channel} message acknowledged "
+                                    f"successfully"
                                 )
                                 return result
                             else:
                                 self.logger.warning(
-                                    f"No acknowledgement received for channel {channel} message"
+                                    f"No acknowledgement received for channel "
+                                    f"{channel} message"
                                 )
 
                                 if attempt < max_retries:
                                     # Wait before retry with exponential backoff
-                                    delay = base_delay * (2 ** attempt)
-                                    self.logger.info(f"Retrying in {delay:.1f} seconds...")
+                                    delay = base_delay * (2**attempt)
+                                    self.logger.info(
+                                        f"Retrying in {delay:.1f} seconds..."
+                                    )
                                     await asyncio.sleep(delay)
                                 continue
 
@@ -777,15 +817,17 @@ class MeshCoreWorker:
 
             except Exception as e:
                 self.logger.error(
-                    f"Error sending message to channel {channel} on attempt {attempt + 1}: {e}"
+                    f"Error sending message to channel {channel} on attempt "
+                    f"{attempt + 1}: {e}"
                 )
                 if attempt < max_retries:
-                    delay = base_delay * (2 ** attempt)
+                    delay = base_delay * (2**attempt)
                     self.logger.info(f"Retrying in {delay:.1f} seconds...")
                     await asyncio.sleep(delay)
 
         self.logger.error(
-            f"Failed to send message to channel {channel} after {max_retries + 1} attempts"
+            f"Failed to send message to channel {channel} after "
+            f"{max_retries + 1} attempts"
         )
         return None
 
@@ -815,7 +857,9 @@ class MeshCoreWorker:
             ack_id = None
             if hasattr(ack_data, "payload"):
                 if isinstance(ack_data.payload, dict):
-                    ack_id = ack_data.payload.get("ack") or ack_data.payload.get("ack_id")
+                    ack_id = ack_data.payload.get("ack") or ack_data.payload.get(
+                        "ack_id"
+                    )
                 elif hasattr(ack_data.payload, "ack"):
                     ack_id = ack_data.payload.ack
 
@@ -836,7 +880,7 @@ class MeshCoreWorker:
             # The MeshCore library should handle path reset through reconnection
             # or by sending a specific command. For now, we'll attempt a trace
             # packet which can help re-establish routing
-            if hasattr(self.meshcore.commands, "send_trace"):
+            if self.meshcore and hasattr(self.meshcore.commands, "send_trace"):
                 await self.meshcore.commands.send_trace(flags=1)
                 # Give the network time to update routing tables
                 await asyncio.sleep(1)

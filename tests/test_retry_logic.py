@@ -5,17 +5,17 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from meshcore_mqtt.config import Config, MeshCoreConfig, MQTTConfig
+from meshcore_mqtt.config import Config, ConnectionType, MeshCoreConfig, MQTTConfig
 from meshcore_mqtt.meshcore_worker import MeshCoreWorker
 
 
 @pytest.fixture
-def mock_config():
+def mock_config() -> Config:
     """Create test configuration."""
     return Config(
         mqtt=MQTTConfig(broker="test-broker"),
         meshcore=MeshCoreConfig(
-            connection_type="tcp",
+            connection_type=ConnectionType.TCP,
             address="test-address",
             port=12345,
             message_retry_count=3,
@@ -26,7 +26,7 @@ def mock_config():
 
 
 @pytest.fixture
-def worker(mock_config):
+def worker(mock_config: Config) -> MeshCoreWorker:
     """Create MeshCore worker instance."""
     return MeshCoreWorker(mock_config)
 
@@ -34,19 +34,19 @@ def worker(mock_config):
 class TestRetryConfiguration:
     """Test retry configuration parameters."""
 
-    def test_default_retry_config(self):
+    def test_default_retry_config(self) -> None:
         """Test default retry configuration values."""
         config = MeshCoreConfig(
-            connection_type="tcp", address="test", port=12345
+            connection_type=ConnectionType.TCP, address="test", port=12345
         )
         assert config.message_retry_count == 3
         assert config.message_retry_delay == 2.0
         assert config.reset_path_on_failure is True
 
-    def test_custom_retry_config(self):
+    def test_custom_retry_config(self) -> None:
         """Test custom retry configuration values."""
         config = MeshCoreConfig(
-            connection_type="tcp",
+            connection_type=ConnectionType.TCP,
             address="test",
             port=12345,
             message_retry_count=5,
@@ -57,11 +57,11 @@ class TestRetryConfiguration:
         assert config.message_retry_delay == 3.5
         assert config.reset_path_on_failure is False
 
-    def test_retry_config_validation(self):
+    def test_retry_config_validation(self) -> None:
         """Test retry configuration validation."""
         # Valid range
         config = MeshCoreConfig(
-            connection_type="tcp",
+            connection_type=ConnectionType.TCP,
             address="test",
             port=12345,
             message_retry_count=10,
@@ -73,7 +73,7 @@ class TestRetryConfiguration:
         # Invalid retry count
         with pytest.raises(ValueError):
             MeshCoreConfig(
-                connection_type="tcp",
+                connection_type=ConnectionType.TCP,
                 address="test",
                 port=12345,
                 message_retry_count=11,
@@ -82,7 +82,7 @@ class TestRetryConfiguration:
         # Invalid retry delay
         with pytest.raises(ValueError):
             MeshCoreConfig(
-                connection_type="tcp",
+                connection_type=ConnectionType.TCP,
                 address="test",
                 port=12345,
                 message_retry_delay=31.0,
@@ -93,7 +93,9 @@ class TestMessageRetryLogic:
     """Test message retry functionality."""
 
     @pytest.mark.asyncio
-    async def test_send_msg_with_retry_success_first_attempt(self, worker):
+    async def test_send_msg_with_retry_success_first_attempt(
+        self, worker: MeshCoreWorker
+    ) -> None:
         """Test successful message send on first attempt."""
         # Mock MeshCore commands
         mock_result = MagicMock()
@@ -113,7 +115,9 @@ class TestMessageRetryLogic:
         )
 
     @pytest.mark.asyncio
-    async def test_send_msg_with_retry_success_after_retries(self, worker):
+    async def test_send_msg_with_retry_success_after_retries(
+        self, worker: MeshCoreWorker
+    ) -> None:
         """Test successful message send after retries."""
         # Mock MeshCore commands
         mock_result = MagicMock()
@@ -125,16 +129,14 @@ class TestMessageRetryLogic:
 
         # Mock ack not received first two times, then received
         ack_results = [False, False, True]
-        with patch.object(
-            worker, "_wait_for_ack", side_effect=ack_results
-        ):
+        with patch.object(worker, "_wait_for_ack", side_effect=ack_results):
             result = await worker._send_msg_with_retry("destination", "message")
 
         assert result == mock_result
         assert worker.meshcore.commands.send_msg.call_count == 3
 
     @pytest.mark.asyncio
-    async def test_send_msg_with_retry_failure(self, worker):
+    async def test_send_msg_with_retry_failure(self, worker: MeshCoreWorker) -> None:
         """Test message send failure after all retries."""
         # Mock MeshCore commands
         mock_result = MagicMock()
@@ -154,7 +156,7 @@ class TestMessageRetryLogic:
         assert worker.meshcore.commands.send_msg.call_count == 4
 
     @pytest.mark.asyncio
-    async def test_send_msg_with_path_reset(self, worker):
+    async def test_send_msg_with_path_reset(self, worker: MeshCoreWorker) -> None:
         """Test path reset after max retries."""
         # Mock MeshCore commands
         mock_result = MagicMock()
@@ -174,7 +176,7 @@ class TestMessageRetryLogic:
         mock_reset_path.assert_called_once_with("destination")
 
     @pytest.mark.asyncio
-    async def test_send_msg_no_ack_info(self, worker):
+    async def test_send_msg_no_ack_info(self, worker: MeshCoreWorker) -> None:
         """Test message send when no ack info is provided."""
         # Mock MeshCore commands - no ack info in response
         mock_result = MagicMock()
@@ -191,7 +193,9 @@ class TestMessageRetryLogic:
         worker.meshcore.commands.send_msg.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_send_chan_msg_with_retry_success(self, worker):
+    async def test_send_chan_msg_with_retry_success(
+        self, worker: MeshCoreWorker
+    ) -> None:
         """Test successful channel message send with retry."""
         # Mock MeshCore commands
         mock_result = MagicMock()
@@ -209,7 +213,7 @@ class TestMessageRetryLogic:
         worker.meshcore.commands.send_chan_msg.assert_called_once_with(0, "message")
 
     @pytest.mark.asyncio
-    async def test_wait_for_ack_timeout(self, worker):
+    async def test_wait_for_ack_timeout(self, worker: MeshCoreWorker) -> None:
         """Test acknowledgement timeout."""
         ack_key = "test_ack"
         event = asyncio.Event()
@@ -221,11 +225,11 @@ class TestMessageRetryLogic:
         assert ack_key not in worker._pending_acks
 
     @pytest.mark.asyncio
-    async def test_wait_for_ack_received(self, worker):
+    async def test_wait_for_ack_received(self, worker: MeshCoreWorker) -> None:
         """Test acknowledgement received."""
         ack_key = "test_ack"
 
-        async def set_ack():
+        async def set_ack() -> None:
             await asyncio.sleep(0.05)
             worker._ack_results[ack_key] = True
             if ack_key in worker._pending_acks:
@@ -238,7 +242,7 @@ class TestMessageRetryLogic:
         result = await worker._wait_for_ack(ack_key, 1.0)
         assert result is True
 
-    def test_on_ack_received(self, worker):
+    def test_on_ack_received(self, worker: MeshCoreWorker) -> None:
         """Test acknowledgement event handler."""
         ack_key = "test_ack"
         event = asyncio.Event()
@@ -255,7 +259,7 @@ class TestMessageRetryLogic:
         assert event.is_set()
 
     @pytest.mark.asyncio
-    async def test_reset_path(self, worker):
+    async def test_reset_path(self, worker: MeshCoreWorker) -> None:
         """Test path reset functionality."""
         worker.meshcore = MagicMock()
         worker.meshcore.commands = MagicMock()
@@ -266,7 +270,7 @@ class TestMessageRetryLogic:
         worker.meshcore.commands.send_trace.assert_called_once_with(flags=1)
 
     @pytest.mark.asyncio
-    async def test_exponential_backoff(self, worker):
+    async def test_exponential_backoff(self, worker: MeshCoreWorker) -> None:
         """Test exponential backoff timing."""
         # Set shorter delays for testing
         worker.config.meshcore.message_retry_delay = 0.1
@@ -282,7 +286,7 @@ class TestMessageRetryLogic:
         # Track timing
         call_times = []
 
-        async def mock_send_msg(*args):
+        async def mock_send_msg(*args: str) -> MagicMock:
             call_times.append(asyncio.get_event_loop().time())
             return mock_result
 
@@ -302,5 +306,5 @@ class TestMessageRetryLogic:
             # Second retry after base_delay * 2 (0.2s)
             assert 0.15 < (call_times[2] - call_times[1]) < 0.3
         if len(call_times) > 3:
-            # Third retry after base_delay * 4 (0.4s)
-            assert 0.35 < (call_times[3] - call_times[2]) < 0.5
+            # Third attempt happens immediately after path reset (no delay)
+            assert (call_times[3] - call_times[2]) < 0.1
