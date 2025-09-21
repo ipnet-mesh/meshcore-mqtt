@@ -74,6 +74,14 @@ class MeshCoreWorker:
         self._shutdown_event = asyncio.Event()
         self._tasks: list[asyncio.Task[Any]] = []
 
+        # Message acknowledgement tracking
+        self._pending_acks: Dict[str, asyncio.Event] = {}
+        self._ack_results: Dict[str, bool] = {}
+
+        # Command deduplication to prevent restart message re-sending
+        self._startup_time = time.time()
+        self._startup_grace_period = 5.0  # 5 seconds to ignore commands during startup
+
     async def start(self) -> None:
         """Start the MeshCore worker."""
         if self._running:
@@ -250,6 +258,14 @@ class MeshCoreWorker:
             except AttributeError:
                 self.logger.warning("NO_MORE_MSGS event type not available")
 
+            # Subscribe to ACK event for acknowledgement tracking
+            try:
+                ack_event = getattr(EventType, "ACK")
+                self.meshcore.subscribe(ack_event, self._on_ack_received)
+                self.logger.info("Subscribed to ACK event for message acknowledgements")
+            except AttributeError:
+                self.logger.warning("ACK event type not available")
+
     async def _message_processor(self) -> None:
         """Process messages from the inbox."""
         self.logger.info("Starting MeshCore message processor")
@@ -293,6 +309,20 @@ class MeshCoreWorker:
             self.logger.error("MeshCore not initialized, cannot process command")
             return
 
+        # Check if this command is received during startup grace period
+        # to prevent processing of stale/retained MQTT messages
+        time_since_startup = time.time() - self._startup_time
+        if time_since_startup < self._startup_grace_period:
+            command_data = message.payload
+            command_type = command_data.get("command_type", "")
+            self.logger.warning(
+                f"Ignoring MQTT command '{command_type}' received during startup "
+                f"grace period ({time_since_startup:.1f}s < "
+                f"{self._startup_grace_period}s). This prevents processing "
+                "stale/retained messages after restart."
+            )
+            return
+
         command_data = message.payload
         command_type = command_data.get("command_type", "")
 
@@ -309,7 +339,7 @@ class MeshCoreWorker:
                         "send_msg requires 'destination' and 'message' fields"
                     )
                     return
-                result = await self.meshcore.commands.send_msg(destination, msg_text)
+                result = await self._send_msg_with_retry(destination, msg_text)
 
             elif command_type == "device_query":
                 result = await self.meshcore.commands.send_device_query()
@@ -332,7 +362,7 @@ class MeshCoreWorker:
                         "send_chan_msg requires 'channel' and 'message' fields"
                     )
                     return
-                result = await self.meshcore.commands.send_chan_msg(channel, msg_text)
+                result = await self._send_chan_msg_with_retry(channel, msg_text)
 
             elif command_type == "send_advert":
                 flood = command_data.get("flood", False)
@@ -751,6 +781,218 @@ class MeshCoreWorker:
         if not self._last_activity:
             return False
         return time.time() - self._last_activity > timeout_seconds
+
+    async def _send_msg_with_retry(self, destination: str, message: str) -> Any:
+        """Send a direct message with retry logic and acknowledgement tracking."""
+        max_retries = self.config.meshcore.message_retry_count
+        base_delay = self.config.meshcore.message_retry_delay
+        reset_path = self.config.meshcore.reset_path_on_failure
+
+        for attempt in range(max_retries + 1):
+            try:
+                self.logger.info(
+                    f"Sending message to {destination} "
+                    f"(attempt {attempt + 1}/{max_retries + 1})"
+                )
+
+                # Send the message
+                if self.meshcore:
+                    result = await self.meshcore.commands.send_msg(destination, message)
+                else:
+                    raise RuntimeError("MeshCore not initialized")
+
+                # Check if we got MSG_SENT with expected_ack info
+                if result and hasattr(result, "payload"):
+                    payload = result.payload
+                    if isinstance(payload, dict):
+                        expected_ack = payload.get("expected_ack")
+                        suggested_timeout = payload.get("suggested_timeout", 7000)
+
+                        if expected_ack:
+                            # Wait for acknowledgement
+                            ack_received = await self._wait_for_ack(
+                                expected_ack, suggested_timeout / 1000
+                            )
+
+                            if ack_received:
+                                self.logger.info(
+                                    f"Message to {destination} acknowledged "
+                                    f"successfully"
+                                )
+                                return result
+                            else:
+                                self.logger.warning(
+                                    f"No acknowledgement received for message to "
+                                    f"{destination}"
+                                )
+
+                                # If this was the last regular attempt, try path reset
+                                # if configured
+                                if attempt == max_retries - 1 and reset_path:
+                                    self.logger.info(
+                                        f"Resetting path for {destination} and trying "
+                                        f"once more"
+                                    )
+                                    await self._reset_path(destination)
+                                    # Continue to the last attempt with reset path
+                                elif attempt < max_retries:
+                                    # Wait before retry with exponential backoff
+                                    delay = base_delay * (2**attempt)
+                                    self.logger.info(
+                                        f"Retrying in {delay:.1f} seconds..."
+                                    )
+                                    await asyncio.sleep(delay)
+                                continue
+
+                # If no ack info in response, consider it successful
+                self.logger.info(f"Message to {destination} sent (no ack tracking)")
+                return result
+
+            except Exception as e:
+                self.logger.error(
+                    f"Error sending message to {destination} on attempt "
+                    f"{attempt + 1}: {e}"
+                )
+                if attempt < max_retries:
+                    delay = base_delay * (2**attempt)
+                    self.logger.info(f"Retrying in {delay:.1f} seconds...")
+                    await asyncio.sleep(delay)
+
+        self.logger.error(
+            f"Failed to send message to {destination} after "
+            f"{max_retries + 1} attempts"
+        )
+        return None
+
+    async def _send_chan_msg_with_retry(self, channel: int, message: str) -> Any:
+        """Send a channel message with retry logic and acknowledgement tracking."""
+        max_retries = self.config.meshcore.message_retry_count
+        base_delay = self.config.meshcore.message_retry_delay
+
+        for attempt in range(max_retries + 1):
+            try:
+                self.logger.info(
+                    f"Sending message to channel {channel} "
+                    f"(attempt {attempt + 1}/{max_retries + 1})"
+                )
+
+                # Send the channel message
+                if self.meshcore:
+                    result = await self.meshcore.commands.send_chan_msg(
+                        channel, message
+                    )
+                else:
+                    raise RuntimeError("MeshCore not initialized")
+
+                # Check if we got MSG_SENT with expected_ack info
+                if result and hasattr(result, "payload"):
+                    payload = result.payload
+                    if isinstance(payload, dict):
+                        expected_ack = payload.get("expected_ack")
+                        suggested_timeout = payload.get("suggested_timeout", 7000)
+
+                        if expected_ack:
+                            # Wait for acknowledgement
+                            ack_received = await self._wait_for_ack(
+                                expected_ack, suggested_timeout / 1000
+                            )
+
+                            if ack_received:
+                                self.logger.info(
+                                    f"Channel {channel} message acknowledged "
+                                    f"successfully"
+                                )
+                                return result
+                            else:
+                                self.logger.warning(
+                                    f"No acknowledgement received for channel "
+                                    f"{channel} message"
+                                )
+
+                                if attempt < max_retries:
+                                    # Wait before retry with exponential backoff
+                                    delay = base_delay * (2**attempt)
+                                    self.logger.info(
+                                        f"Retrying in {delay:.1f} seconds..."
+                                    )
+                                    await asyncio.sleep(delay)
+                                continue
+
+                # If no ack info in response, consider it successful
+                self.logger.info(f"Message to channel {channel} sent (no ack tracking)")
+                return result
+
+            except Exception as e:
+                self.logger.error(
+                    f"Error sending message to channel {channel} on attempt "
+                    f"{attempt + 1}: {e}"
+                )
+                if attempt < max_retries:
+                    delay = base_delay * (2**attempt)
+                    self.logger.info(f"Retrying in {delay:.1f} seconds...")
+                    await asyncio.sleep(delay)
+
+        self.logger.error(
+            f"Failed to send message to channel {channel} after "
+            f"{max_retries + 1} attempts"
+        )
+        return None
+
+    async def _wait_for_ack(self, expected_ack: str, timeout: float) -> bool:
+        """Wait for acknowledgement with timeout."""
+        ack_key = str(expected_ack)
+        event = asyncio.Event()
+        self._pending_acks[ack_key] = event
+
+        try:
+            # Wait for the ack or timeout
+            await asyncio.wait_for(event.wait(), timeout=timeout)
+            # Check the result
+            return self._ack_results.get(ack_key, False)
+        except asyncio.TimeoutError:
+            self.logger.debug(f"Timeout waiting for ack: {ack_key}")
+            return False
+        finally:
+            # Clean up
+            self._pending_acks.pop(ack_key, None)
+            self._ack_results.pop(ack_key, None)
+
+    def _on_ack_received(self, ack_data: Any) -> None:
+        """Handle received acknowledgement."""
+        try:
+            # Extract ack identifier from the event data
+            ack_id = None
+            if hasattr(ack_data, "payload"):
+                if isinstance(ack_data.payload, dict):
+                    ack_id = ack_data.payload.get("ack") or ack_data.payload.get(
+                        "ack_id"
+                    )
+                elif hasattr(ack_data.payload, "ack"):
+                    ack_id = ack_data.payload.ack
+
+            if ack_id:
+                ack_key = str(ack_id)
+                if ack_key in self._pending_acks:
+                    self.logger.debug(f"Received ack: {ack_key}")
+                    self._ack_results[ack_key] = True
+                    self._pending_acks[ack_key].set()
+
+        except Exception as e:
+            self.logger.error(f"Error processing ack: {e}")
+
+    async def _reset_path(self, destination: str) -> None:
+        """Reset the routing path for a destination."""
+        try:
+            self.logger.info(f"Resetting routing path for {destination}")
+            # The MeshCore library should handle path reset through reconnection
+            # or by sending a specific command. For now, we'll attempt a trace
+            # packet which can help re-establish routing
+            if self.meshcore and hasattr(self.meshcore.commands, "send_trace"):
+                await self.meshcore.commands.send_trace(flags=1)
+                # Give the network time to update routing tables
+                await asyncio.sleep(1)
+        except Exception as e:
+            self.logger.warning(f"Error resetting path for {destination}: {e}")
 
     def serialize_to_json(self, data: Any) -> str:
         """Safely serialize any data to JSON string."""

@@ -147,6 +147,23 @@ def setup_logging(level: str) -> None:
     help="Comma-separated list of MeshCore event types to subscribe to",
 )
 @click.option(
+    "--meshcore-message-retry-count",
+    type=click.IntRange(0, 10),
+    default=3,
+    help="Number of times to retry sending a message on failure (default: 3)",
+)
+@click.option(
+    "--meshcore-message-retry-delay",
+    type=click.FloatRange(0.5, 30.0),
+    default=2.0,
+    help="Base delay in seconds between message retries (default: 2.0)",
+)
+@click.option(
+    "--meshcore-reset-path-on-failure/--no-meshcore-reset-path-on-failure",
+    default=True,
+    help="Reset routing path after max retries and try once more (default: enabled)",
+)
+@click.option(
     "--log-level",
     type=click.Choice(["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]),
     default="INFO",
@@ -178,6 +195,9 @@ def main(
     meshcore_timeout: int,
     meshcore_auto_fetch_restart_delay: int,
     meshcore_events: Optional[str],
+    meshcore_message_retry_count: int,
+    meshcore_message_retry_delay: float,
+    meshcore_reset_path_on_failure: bool,
     log_level: str,
     env: bool,
 ) -> None:
@@ -241,6 +261,9 @@ def main(
                     if events is not None
                     else MeshCoreConfig.model_fields["events"].default
                 ),
+                message_retry_count=meshcore_message_retry_count,
+                message_retry_delay=meshcore_message_retry_delay,
+                reset_path_on_failure=meshcore_reset_path_on_failure,
             )
 
             config = Config(
