@@ -1,8 +1,10 @@
 """Test message deduplication functionality."""
 
-import pytest
 from unittest.mock import Mock
-from meshcore_mqtt.config import Config, MeshCoreConfig, MQTTConfig
+
+import pytest
+
+from meshcore_mqtt.config import Config, ConnectionType, MeshCoreConfig, MQTTConfig
 from meshcore_mqtt.meshcore_worker import MeshCoreWorker
 
 
@@ -10,11 +12,11 @@ class TestMessageDeduplication:
     """Test message deduplication in MeshCore worker."""
 
     @pytest.fixture
-    def config(self):
+    def config(self) -> Config:
         """Create a test configuration."""
         return Config(
             meshcore=MeshCoreConfig(
-                connection_type="tcp",
+                connection_type=ConnectionType.TCP,
                 address="127.0.0.1",
                 port=12345,
                 events=["CONTACT_MSG_RECV"],
@@ -27,11 +29,13 @@ class TestMessageDeduplication:
         )
 
     @pytest.fixture
-    def worker(self, config):
+    def worker(self, config: Config) -> MeshCoreWorker:
         """Create a MeshCore worker for testing."""
         return MeshCoreWorker(config)
 
-    def test_fingerprint_generation_message_events(self, worker):
+    def test_fingerprint_generation_message_events(
+        self, worker: MeshCoreWorker
+    ) -> None:
         """Test fingerprint generation for message events."""
         # Mock message event data
         mock_event = Mock()
@@ -51,7 +55,9 @@ class TestMessageDeduplication:
         assert fingerprint1 == fingerprint2
         assert len(fingerprint1) == 16  # MD5 hash truncated to 16 chars
 
-    def test_fingerprint_generation_different_messages(self, worker):
+    def test_fingerprint_generation_different_messages(
+        self, worker: MeshCoreWorker
+    ) -> None:
         """Test that different messages generate different fingerprints."""
         # Mock first message
         mock_event1 = Mock()
@@ -74,7 +80,7 @@ class TestMessageDeduplication:
 
         assert fingerprint1 != fingerprint2
 
-    def test_duplicate_detection(self, worker):
+    def test_duplicate_detection(self, worker: MeshCoreWorker) -> None:
         """Test duplicate message detection."""
         fingerprint = "test123456789abc"
 
@@ -87,7 +93,7 @@ class TestMessageDeduplication:
         # Different fingerprint should not be duplicate
         assert not worker._is_duplicate_message("different456789xyz")
 
-    def test_cache_expiry(self, worker):
+    def test_cache_expiry(self, worker: MeshCoreWorker) -> None:
         """Test that old cache entries are expired."""
         import time
 
@@ -102,7 +108,7 @@ class TestMessageDeduplication:
         # Should not be duplicate after expiry
         assert not worker._is_duplicate_message(fingerprint)
 
-    def test_cache_size_limit(self, worker):
+    def test_cache_size_limit(self, worker: MeshCoreWorker) -> None:
         """Test that cache size is limited."""
         # Set small cache size for testing
         worker._cache_max_size = 3
@@ -115,7 +121,7 @@ class TestMessageDeduplication:
         # Cache should not exceed max size after cleanup
         assert len(worker._message_cache) <= worker._cache_max_size
 
-    def test_connection_events_not_deduplicated(self, worker):
+    def test_connection_events_not_deduplicated(self, worker: MeshCoreWorker) -> None:
         """Test that connection events are not subject to deduplication."""
         # Mock connection event
         mock_event = Mock()
