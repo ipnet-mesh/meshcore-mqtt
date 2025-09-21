@@ -93,6 +93,24 @@ class MeshCoreConfig(BaseModel):
         ],
         description="List of MeshCore event types to subscribe to",
     )
+    message_retry_count: int = Field(
+        default=3,
+        ge=0,
+        le=10,
+        description="Number of times to retry sending a message on failure",
+    )
+    message_retry_delay: float = Field(
+        default=2.0,
+        ge=0.5,
+        le=30.0,
+        description=(
+            "Base delay in seconds between message retries (exponential backoff)"
+        ),
+    )
+    reset_path_on_failure: bool = Field(
+        default=True,
+        description="Reset routing path after max retries and try once more",
+    )
 
     @field_validator("port")
     @classmethod
@@ -236,6 +254,12 @@ class Config(BaseModel):
                 if events is not None
                 else MeshCoreConfig.model_fields["events"].default
             ),
+            message_retry_count=int(os.getenv("MESHCORE_MESSAGE_RETRY_COUNT", "3")),
+            message_retry_delay=float(os.getenv("MESHCORE_MESSAGE_RETRY_DELAY", "2.0")),
+            reset_path_on_failure=os.getenv(
+                "MESHCORE_RESET_PATH_ON_FAILURE", "true"
+            ).lower()
+            == "true",
         )
 
         return cls(
