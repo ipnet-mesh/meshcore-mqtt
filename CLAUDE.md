@@ -16,10 +16,12 @@ This project is a **MeshCore MQTT Bridge** - a robust Python application that br
 - **Flexible configuration**: JSON/YAML files, environment variables, CLI arguments
 - **Configurable event system**: Subscribe to specific MeshCore event types
 - **Robust MQTT integration**: Authentication, QoS, retention, auto-reconnection
+- **Message rate limiting**: Configurable rate limiting to prevent network flooding and ensure reliable message delivery
 - **Health monitoring**: Built-in health checks and automatic recovery for both workers
 - **Async architecture**: Built with Python asyncio for high performance
 - **Type safety**: Full type annotations with mypy support
-- **Comprehensive testing**: 59+ tests with pytest and pytest-asyncio
+- **Comprehensive testing**: 70+ tests with pytest and pytest-asyncio including rate limiting tests
+- **Streamlined CI/CD**: Single pre-commit based CI workflow with automated quality checks
 
 ## Architecture
 
@@ -41,10 +43,11 @@ The bridge uses an **Inbox/Outbox Architecture** with independent workers coordi
 
 3. **MeshCore Worker** (`meshcore_mqtt/meshcore_worker.py`)
    - Independent worker managing MeshCore device connection
-   - Handles device commands forwarded from MQTT worker
+   - Handles device commands forwarded from MQTT worker with rate limiting
    - Auto-reconnection with exponential backoff and health monitoring
    - Forwards MeshCore events to MQTT worker via message bus
    - Manages auto-fetch restart after NO_MORE_MSGS events
+   - Configurable message rate limiting to prevent network flooding
 
 4. **MQTT Worker** (`meshcore_mqtt/mqtt_worker.py`)
    - Independent worker managing MQTT broker connection
@@ -89,6 +92,21 @@ The bridge automatically handles `NO_MORE_MSGS` events from MeshCore by restarti
 - **Behavior**: When `NO_MORE_MSGS` is received, waits the configured delay then restarts auto-fetching
 - **Environment Variable**: `MESHCORE_AUTO_FETCH_RESTART_DELAY=10`
 - **CLI Argument**: `--meshcore-auto-fetch-restart-delay 10`
+
+### Message Rate Limiting Feature
+
+The bridge includes configurable message rate limiting to prevent network flooding and ensure reliable message delivery:
+
+- **Purpose**: Prevents overwhelming the MeshCore device with rapid message sending commands
+- **Initial Delay**: `message_initial_delay` (0.0-60.0 seconds, default: 5.0) - delay before sending the first message
+- **Send Delay**: `message_send_delay` (0.0-60.0 seconds, default: 10.0) - delay between consecutive message sends
+- **Behavior**: Messages are queued and sent with appropriate delays using an async rate-limiting system
+- **Environment Variables**:
+  - `MESHCORE_MESSAGE_INITIAL_DELAY=5.0`
+  - `MESHCORE_MESSAGE_SEND_DELAY=10.0`
+- **CLI Arguments**:
+  - `--meshcore-message-initial-delay 5.0`
+  - `--meshcore-message-send-delay 10.0`
 
 ### MQTT Topics
 
@@ -203,12 +221,14 @@ mosquitto_pub -h localhost -t "meshcore/command/send_telemetry_req" \
 
 ### Code Quality Tools
 
-The project uses these tools (configured in `pyproject.toml`):
+The project uses these tools (configured in `pyproject.toml` and `.pre-commit-config.yaml`):
 - **Black**: Code formatting (line length: 88)
 - **Flake8**: Linting with custom rules
 - **MyPy**: Type checking with strict settings
+- **isort**: Import sorting and organization
 - **Pytest**: Testing with asyncio support
-- **Pre-commit**: Automated code quality checks
+- **Pre-commit**: Automated code quality checks and hooks
+- **Streamlined CI**: Single pre-commit based CI workflow replacing multiple separate workflows
 
 ### Testing Strategy
 
@@ -218,6 +238,7 @@ The project uses these tools (configured in `pyproject.toml`):
 - `tests/test_configurable_events.py` - Event configuration (13 tests)
 - `tests/test_json_serialization.py` - JSON handling (10 tests)
 - `tests/test_logging.py` - Logging configuration (6 tests)
+- `tests/test_rate_limiting.py` - Message rate limiting functionality (9 tests)
 
 **Key Test Areas**:
 - Configuration validation and loading
@@ -225,6 +246,7 @@ The project uses these tools (configured in `pyproject.toml`):
 - Event handler mapping and subscription
 - JSON serialization edge cases
 - MQTT topic generation and command handling
+- Message rate limiting and queue management
 - Health monitoring and recovery mechanisms
 - Logging setup and third-party library control
 
@@ -289,28 +311,35 @@ python -m meshcore_mqtt.main --env
 
 ### Major Features Implemented
 
-1. **Inbox/Outbox Architecture (Latest)**
+1. **Message Rate Limiting (Latest)**
+   - Configurable rate limiting for message sending commands
+   - Initial delay and send delay configuration options
+   - Async message queue with proper timing controls
+   - Comprehensive test coverage for rate limiting functionality
+
+2. **Streamlined CI/CD Pipeline**
+   - Consolidated multiple CI workflows into single pre-commit based pipeline
+   - Reduced from 3 separate workflows (ci.yml, test.yml, code-quality.yml) to 1
+   - Improved maintainability and faster CI execution
+   - Full integration with existing pre-commit configuration
+
+3. **Inbox/Outbox Architecture**
    - Complete restructure to independent worker pattern
    - Message bus system for inter-worker communication
    - Enhanced health monitoring and recovery
    - Improved resilience and testability
 
-2. **TLS/SSL Support**
+4. **TLS/SSL Support**
    - Secure MQTT connections with configurable certificates
    - Support for custom CA, client certificates, and private keys
    - Optional certificate verification bypass for testing
 
-3. **Enhanced Command System**
-   - Full bidirectional MQTT ↔ MeshCore command support
-   - Structured command handling with proper error reporting
-   - Support for all major MeshCore operations
-
-4. **JSON Serialization (6b492db)**
+6. **JSON Serialization**
    - Robust JSON serialization handling all Python data types
    - Fallback mechanisms for complex objects
    - Comprehensive error handling and validation
 
-5. **Configurable Events (f7c10cc)**
+7. **Configurable Events**
    - Made MeshCore event types configurable
    - Support for config files, env vars, and CLI args
    - Case-insensitive event parsing with validation
@@ -339,6 +368,22 @@ def _on_meshcore_event(self, event_data: Any) -> None:
         payload={"event_data": event_data, "timestamp": time.time()}
     )
     asyncio.create_task(self.message_bus.send_message(message))
+```
+
+**Rate Limited Command Execution**:
+```python
+async def _queue_rate_limited_command(
+    self, command_type: str, command_data: dict
+) -> Any:
+    """Queue a command for rate-limited execution."""
+    future: asyncio.Future[Any] = asyncio.Future()
+    message_data = {
+        "command_type": command_type,
+        "future": future,
+        **command_data,
+    }
+    await self._message_queue.put(message_data)
+    return await future
 ```
 
 **Configuration Validation**:

@@ -3,8 +3,6 @@
 [![License](https://img.shields.io/badge/License-GPL_v3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 [![Python](https://img.shields.io/badge/Python-3.11+-blue.svg)](https://www.python.org/)
 [![CI](https://github.com/ipnet-mesh/meshcore-mqtt/actions/workflows/ci.yml/badge.svg)](https://github.com/ipnet-mesh/meshcore-mqtt/actions/workflows/ci.yml)
-[![Code Quality](https://github.com/ipnet-mesh/meshcore-mqtt/actions/workflows/code-quality.yml/badge.svg)](https://github.com/ipnet-mesh/meshcore-mqtt/actions/workflows/code-quality.yml)
-[![Tests](https://github.com/ipnet-mesh/meshcore-mqtt/actions/workflows/test.yml/badge.svg)](https://github.com/ipnet-mesh/meshcore-mqtt/actions/workflows/test.yml)
 [![Docker Build and Push](https://github.com/ipnet-mesh/meshcore-mqtt/actions/workflows/docker-build.yml/badge.svg)](https://github.com/ipnet-mesh/meshcore-mqtt/actions/workflows/docker-build.yml)
 [![Code style: black](https://img.shields.io/badge/Code%20style-black-000000.svg)](https://github.com/psf/black)
 [![Typing: mypy](https://img.shields.io/badge/Typing-mypy-blue.svg)](https://mypy.readthedocs.io/)
@@ -20,11 +18,12 @@ A robust bridge service that connects MeshCore devices to MQTT brokers, enabling
 - **Flexible Configuration**: JSON, YAML, environment variables, and command-line configuration options
 - **MQTT Integration**: Full MQTT client with authentication, QoS, retention, and auto-reconnection
 - **Configurable Event Monitoring**: Subscribe to specific MeshCore event types for optimal performance
+- **Message Rate Limiting**: Configurable rate limiting to prevent network flooding and ensure reliable message delivery
 - **Health Monitoring**: Built-in health checks and automatic recovery for both workers
 - **Async Architecture**: Built with Python asyncio for high performance and concurrent operations
 - **Type Safety**: Full type annotations with mypy support
-- **Comprehensive Testing**: 59+ unit tests with pytest and pytest-asyncio
-- **Code Quality**: Pre-commit hooks with black formatting, flake8 linting, and automated testing
+- **Comprehensive Testing**: 70+ unit tests with pytest and pytest-asyncio including rate limiting tests
+- **Code Quality**: Streamlined CI/CD with pre-commit hooks for black formatting, flake8 linting, mypy type checking, and automated testing
 
 ## Installation
 
@@ -70,6 +69,8 @@ The bridge supports multiple configuration methods with the following precedence
 - `meshcore_baudrate`: Baudrate for serial connections (default: 115200)
 - `meshcore_timeout`: Operation timeout in seconds (default: 5)
 - `meshcore_auto_fetch_restart_delay`: Delay in seconds before restarting auto-fetch after NO_MORE_MSGS (default: 5, range: 1-60)
+- `meshcore_message_initial_delay`: Initial delay in seconds before sending the first message (default: 5.0, range: 0.0-60.0)
+- `meshcore_message_send_delay`: Delay in seconds between consecutive message sends (default: 10.0, range: 0.0-60.0)
 - `meshcore_events`: List of MeshCore event types to subscribe to (see [Event Types](#event-types))
 
 #### General Settings
@@ -96,6 +97,8 @@ The bridge supports multiple configuration methods with the following precedence
     "baudrate": 115200,
     "timeout": 10,
     "auto_fetch_restart_delay": 10,
+    "message_initial_delay": 5.0,
+    "message_send_delay": 10.0,
     "events": [
       "CONTACT_MSG_RECV",
       "CHANNEL_MSG_RECV",
@@ -127,6 +130,8 @@ meshcore:
   baudrate: 115200
   timeout: 10
   auto_fetch_restart_delay: 10
+  message_initial_delay: 5.0
+  message_send_delay: 10.0
   events:
     - CONTACT_MSG_RECV
     - CHANNEL_MSG_RECV
@@ -149,6 +154,8 @@ export MESHCORE_ADDRESS=192.168.1.100
 export MESHCORE_PORT=12345
 export MESHCORE_BAUDRATE=115200
 export MESHCORE_AUTO_FETCH_RESTART_DELAY=10
+export MESHCORE_MESSAGE_INITIAL_DELAY=5.0
+export MESHCORE_MESSAGE_SEND_DELAY=10.0
 export MESHCORE_EVENTS="CONNECTED,DISCONNECTED,BATTERY,DEVICE_INFO"
 export LOG_LEVEL=INFO
 ```
@@ -548,6 +555,8 @@ MESHCORE_BAUDRATE=115200         # For serial connections
 MESHCORE_PORT=4403              # Only for TCP connections
 MESHCORE_TIMEOUT=30
 MESHCORE_AUTO_FETCH_RESTART_DELAY=10  # Restart delay after NO_MORE_MSGS (1-60 seconds)
+MESHCORE_MESSAGE_INITIAL_DELAY=5.0    # Initial delay before first message (0.0-60.0 seconds)
+MESHCORE_MESSAGE_SEND_DELAY=10.0      # Delay between consecutive messages (0.0-60.0 seconds)
 
 # Event Configuration (comma-separated)
 MESHCORE_EVENTS=CONNECTED,DISCONNECTED,BATTERY,DEVICE_INFO
