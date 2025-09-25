@@ -7,7 +7,6 @@ from pathlib import Path
 from typing import Any, List, Optional, Union
 
 import yaml
-from meshcore import EventType
 from pydantic import BaseModel, Field, field_validator
 
 
@@ -118,8 +117,14 @@ class MeshCoreConfig(BaseModel):
         # Normalize to uppercase for case-insensitive validation
         normalized_events = [event.upper() for event in v]
 
-        # Valid MeshCore event types (based on actual EventType enum)
-        valid_events = [e.name for e in EventType]
+        # Valid MeshCore event types (from actual EventType enum)
+        try:
+            from meshcore import EventType
+            valid_events = set([e.name for e in EventType])
+        except Exception as e:
+            raise ImportError(
+                "Cannot determine valid MeshCore event types"
+            ) from e
 
         invalid_events = [
             event for event in normalized_events if event not in valid_events
