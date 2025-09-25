@@ -98,15 +98,15 @@ The bridge automatically handles `NO_MORE_MSGS` events from MeshCore by restarti
 The bridge includes configurable message rate limiting to prevent network flooding and ensure reliable message delivery:
 
 - **Purpose**: Prevents overwhelming the MeshCore device with rapid message sending commands
-- **Initial Delay**: `message_initial_delay` (0.0-60.0 seconds, default: 5.0) - delay before sending the first message
-- **Send Delay**: `message_send_delay` (0.0-60.0 seconds, default: 10.0) - delay between consecutive message sends
+- **Initial Delay**: `message_initial_delay` (0.0-60.0 seconds, default: 15.0) - delay before sending the first message
+- **Send Delay**: `message_send_delay` (0.0-60.0 seconds, default: 15.0) - delay between consecutive message sends
 - **Behavior**: Messages are queued and sent with appropriate delays using an async rate-limiting system
 - **Environment Variables**:
-  - `MESHCORE_MESSAGE_INITIAL_DELAY=5.0`
-  - `MESHCORE_MESSAGE_SEND_DELAY=10.0`
+  - `MESHCORE_MESSAGE_INITIAL_DELAY=15.0`
+  - `MESHCORE_MESSAGE_SEND_DELAY=15.0`
 - **CLI Arguments**:
-  - `--meshcore-message-initial-delay 5.0`
-  - `--meshcore-message-send-delay 10.0`
+  - `--meshcore-message-initial-delay 15.0`
+  - `--meshcore-message-send-delay 15.0`
 
 ### MQTT Topics
 

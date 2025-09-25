@@ -86,6 +86,7 @@ class MeshCoreWorker:
         self._message_queue: asyncio.Queue[dict] = asyncio.Queue()
         self._last_message_time: Optional[float] = None
         self._rate_limit_task: Optional[asyncio.Task[None]] = None
+        self._send_lock = asyncio.Lock()  # Global send lock for all message operations
 
     async def start(self) -> None:
         """Start the MeshCore worker."""
@@ -95,6 +96,8 @@ class MeshCoreWorker:
 
         self.logger.info("Starting MeshCore worker")
         self._running = True
+        # Reset message rate limiting timing on worker start
+        self._last_message_time = None
 
         # Update status
         self.message_bus.update_component_status(
@@ -352,17 +355,23 @@ class MeshCoreWorker:
                 )
 
             elif command_type == "device_query":
-                result = await self.meshcore.commands.send_device_query()
+                result = await self._queue_rate_limited_command(
+                    command_type, command_data
+                )
 
             elif command_type == "get_battery":
-                result = await self.meshcore.commands.get_bat()
+                result = await self._queue_rate_limited_command(
+                    command_type, command_data
+                )
 
             elif command_type == "set_name":
                 name = command_data.get("name", "")
                 if not name:
                     self.logger.error("set_name requires 'name' field")
                     return
-                result = await self.meshcore.commands.set_name(name)
+                result = await self._queue_rate_limited_command(
+                    command_type, command_data
+                )
 
             elif command_type == "send_chan_msg":
                 channel = command_data.get("channel")
@@ -377,16 +386,13 @@ class MeshCoreWorker:
                 )
 
             elif command_type == "send_advert":
-                flood = command_data.get("flood", False)
-                result = await self.meshcore.commands.send_advert(flood=flood)
+                result = await self._queue_rate_limited_command(
+                    command_type, command_data
+                )
 
             elif command_type == "send_trace":
-                auth_code = command_data.get("auth_code", 0)
-                tag = command_data.get("tag")  # Optional, will be auto-generated
-                flags = command_data.get("flags", 0)
-                path = command_data.get("path")  # Optional path specification
-                result = await self.meshcore.commands.send_trace(
-                    auth_code=auth_code, tag=tag, flags=flags, path=path
+                result = await self._queue_rate_limited_command(
+                    command_type, command_data
                 )
 
             elif command_type == "send_telemetry_req":
@@ -394,7 +400,9 @@ class MeshCoreWorker:
                 if not destination:
                     self.logger.error("send_telemetry_req requires 'destination' field")
                     return
-                result = await self.meshcore.commands.send_telemetry_req(destination)
+                result = await self._queue_rate_limited_command(
+                    command_type, command_data
+                )
 
             else:
                 self.logger.warning(f"Unknown command type: {command_type}")
@@ -583,7 +591,7 @@ class MeshCoreWorker:
                 await asyncio.sleep(60)
 
     async def _message_rate_limiter(self) -> None:
-        """Rate-limited message processor to prevent network flooding."""
+        """MQTT command processor - processes commands from MQTT queue."""
         self.logger.info("Starting message rate limiter")
 
         while self._running:
@@ -596,38 +604,70 @@ class MeshCoreWorker:
                 except asyncio.TimeoutError:
                     continue
 
-                # Apply rate limiting delays
-                current_time = time.time()
-
-                # Apply initial delay for the first message
-                if self._last_message_time is None:
-                    if self.config.meshcore.message_initial_delay > 0:
-                        self.logger.debug(
-                            f"Applying initial delay of "
-                            f"{self.config.meshcore.message_initial_delay}s "
-                            f"before first message"
-                        )
-                        await asyncio.sleep(self.config.meshcore.message_initial_delay)
-                else:
-                    # Apply delay between consecutive messages
-                    time_since_last = current_time - self._last_message_time
-                    required_delay = self.config.meshcore.message_send_delay
-
-                    if time_since_last < required_delay:
-                        sleep_time = required_delay - time_since_last
-                        self.logger.debug(
-                            f"Rate limiting: waiting {sleep_time:.1f}s "
-                            f"before next message"
-                        )
-                        await asyncio.sleep(sleep_time)
-
-                # Send the message
+                # Execute command (rate limiting handled in individual operations)
                 await self._execute_rate_limited_message(message_data)
-                self._last_message_time = time.time()
 
             except Exception as e:
                 self.logger.error(f"Error in message rate limiter: {e}")
                 await asyncio.sleep(1)
+
+    async def _rate_limited_send(
+        self, operation_name: str, send_func: Any, *args: Any, **kwargs: Any
+    ) -> Any:
+        """Apply rate limiting to any message send operation."""
+        # Check if rate limiting is disabled (both delays are 0)
+        if (
+            self.config.meshcore.message_initial_delay == 0
+            and self.config.meshcore.message_send_delay == 0
+        ):
+            # No rate limiting, execute immediately
+            return await send_func(*args, **kwargs)
+
+        # Check if we're in a test environment where the lock might not be needed
+        if not hasattr(self, "_send_lock") or self._send_lock is None:
+            self._send_lock = asyncio.Lock()
+
+        async with self._send_lock:
+            # Apply rate limiting delays
+            current_time = time.time()
+
+            # Apply initial delay for the first message
+            if self._last_message_time is None:
+                if self.config.meshcore.message_initial_delay > 0:
+                    self.logger.info(
+                        f"Rate limiting ({operation_name}): applying initial delay of "
+                        f"{self.config.meshcore.message_initial_delay}s"
+                    )
+                    await asyncio.sleep(self.config.meshcore.message_initial_delay)
+            else:
+                # Apply delay between consecutive messages
+                time_since_last = current_time - self._last_message_time
+                required_delay = self.config.meshcore.message_send_delay
+
+                self.logger.info(
+                    f"Rate limiting ({operation_name}): "
+                    f"time_since_last={time_since_last:.2f}s, "
+                    f"required_delay={required_delay}s"
+                )
+
+                if time_since_last < required_delay:
+                    sleep_time = required_delay - time_since_last
+                    self.logger.info(
+                        f"Rate limiting ({operation_name}): waiting {sleep_time:.1f}s "
+                        f"before sending"
+                    )
+                    await asyncio.sleep(sleep_time)
+
+            # Execute the send operation
+            try:
+                result = await send_func(*args, **kwargs)
+                self._last_message_time = time.time()
+                return result
+            except Exception as e:
+                self.logger.error(
+                    f"Rate-limited send operation '{operation_name}' failed: {e}"
+                )
+                raise
 
     async def _queue_rate_limited_command(
         self, command_type: str, command_data: dict
@@ -695,22 +735,33 @@ class MeshCoreWorker:
 
             elif command_type == "send_advert":
                 flood = message_data.get("flood", False)
-                result = await self.meshcore.commands.send_advert(flood=flood)
+                result = await self._rate_limited_send(
+                    "send_advert", self.meshcore.commands.send_advert, flood=flood
+                )
 
             elif command_type == "send_trace":
                 auth_code = message_data.get("auth_code", 0)
                 tag = message_data.get("tag")
                 flags = message_data.get("flags", 0)
                 path = message_data.get("path")
-                result = await self.meshcore.commands.send_trace(
-                    auth_code=auth_code, tag=tag, flags=flags, path=path
+                result = await self._rate_limited_send(
+                    "send_trace",
+                    self.meshcore.commands.send_trace,
+                    auth_code=auth_code,
+                    tag=tag,
+                    flags=flags,
+                    path=path,
                 )
 
             elif command_type == "send_telemetry_req":
                 destination = message_data.get("destination")
                 if not isinstance(destination, str):
                     raise ValueError("Invalid destination type")
-                result = await self.meshcore.commands.send_telemetry_req(destination)
+                result = await self._rate_limited_send(
+                    f"send_telemetry_req({destination})",
+                    self.meshcore.commands.send_telemetry_req,
+                    destination,
+                )
 
             # Set the result on the future
             if future and not future.done():
@@ -948,9 +999,14 @@ class MeshCoreWorker:
                     f"(attempt {attempt + 1}/{max_retries + 1})"
                 )
 
-                # Send the message
+                # Send the message with rate limiting
                 if self.meshcore:
-                    result = await self.meshcore.commands.send_msg(destination, message)
+                    result = await self._rate_limited_send(
+                        f"send_msg({destination})",
+                        self.meshcore.commands.send_msg,
+                        destination,
+                        message,
+                    )
                 else:
                     raise RuntimeError("MeshCore not initialized")
 
@@ -1029,10 +1085,13 @@ class MeshCoreWorker:
                     f"(attempt {attempt + 1}/{max_retries + 1})"
                 )
 
-                # Send the channel message
+                # Send the channel message with rate limiting
                 if self.meshcore:
-                    result = await self.meshcore.commands.send_chan_msg(
-                        channel, message
+                    result = await self._rate_limited_send(
+                        f"send_chan_msg(channel_{channel})",
+                        self.meshcore.commands.send_chan_msg,
+                        channel,
+                        message,
                     )
                 else:
                     raise RuntimeError("MeshCore not initialized")
@@ -1141,7 +1200,11 @@ class MeshCoreWorker:
             # or by sending a specific command. For now, we'll attempt a trace
             # packet which can help re-establish routing
             if self.meshcore and hasattr(self.meshcore.commands, "send_trace"):
-                await self.meshcore.commands.send_trace(flags=1)
+                await self._rate_limited_send(
+                    f"path_reset_trace({destination})",
+                    self.meshcore.commands.send_trace,
+                    flags=1,
+                )
                 # Give the network time to update routing tables
                 await asyncio.sleep(1)
         except Exception as e:

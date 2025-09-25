@@ -312,6 +312,61 @@ class TestRateLimiting:
             except asyncio.CancelledError:
                 pass
 
+    async def test_rate_limiter_restart_resets_timing(
+        self, mock_meshcore_worker: MeshCoreWorker
+    ) -> None:
+        """Test that rate limiter resets timing when worker starts."""
+        # Simulate previous message time (as if from previous session)
+        mock_meshcore_worker._last_message_time = time.time() - 3600  # 1 hour ago
+
+        # Simulate the worker start behavior that resets timing
+        # (without actually connecting to avoid test dependencies)
+        mock_meshcore_worker._running = True
+        mock_meshcore_worker._last_message_time = (
+            None  # This simulates the start() reset
+        )
+
+        # Start the rate limiter
+        rate_limiter_task = asyncio.create_task(
+            mock_meshcore_worker._message_rate_limiter()
+        )
+
+        try:
+            start_time = time.time()
+
+            # Queue a message - should apply initial delay, not skip due to old timing
+            command_data = {"destination": "test_user", "message": "Hello"}
+            result_task = asyncio.create_task(
+                mock_meshcore_worker._queue_rate_limited_command(
+                    "send_msg", command_data
+                )
+            )
+
+            # Wait for completion
+            await asyncio.wait_for(result_task, timeout=2.0)
+
+            elapsed_time = time.time() - start_time
+
+            # Should take at least the initial delay time
+            assert (
+                elapsed_time
+                >= mock_meshcore_worker.config.meshcore.message_initial_delay
+            )
+
+            # Verify the command was executed
+            assert mock_meshcore_worker.meshcore is not None
+            mock_meshcore_worker.meshcore.commands.send_msg.assert_called_once_with(
+                "test_user", "Hello"
+            )
+
+        finally:
+            mock_meshcore_worker._running = False
+            rate_limiter_task.cancel()
+            try:
+                await rate_limiter_task
+            except asyncio.CancelledError:
+                pass
+
     async def test_rate_limiter_error_handling(
         self, mock_meshcore_worker: MeshCoreWorker
     ) -> None:

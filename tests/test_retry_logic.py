@@ -21,6 +21,8 @@ def mock_config() -> Config:
             message_retry_count=3,
             message_retry_delay=1.0,
             reset_path_on_failure=True,
+            message_initial_delay=0.0,  # Disable rate limiting for retry tests
+            message_send_delay=0.0,  # Disable rate limiting for retry tests
         ),
     )
 
