@@ -164,6 +164,18 @@ def setup_logging(level: str) -> None:
     help="Reset routing path after max retries and try once more (default: enabled)",
 )
 @click.option(
+    "--meshcore-message-initial-delay",
+    type=click.FloatRange(0.0, 60.0),
+    default=5.0,
+    help="Initial delay in seconds before sending the first message (default: 5.0)",
+)
+@click.option(
+    "--meshcore-message-send-delay",
+    type=click.FloatRange(0.0, 60.0),
+    default=10.0,
+    help="Delay in seconds between consecutive message sends (default: 10.0)",
+)
+@click.option(
     "--log-level",
     type=click.Choice(["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]),
     default="INFO",
@@ -198,6 +210,8 @@ def main(
     meshcore_message_retry_count: int,
     meshcore_message_retry_delay: float,
     meshcore_reset_path_on_failure: bool,
+    meshcore_message_initial_delay: float,
+    meshcore_message_send_delay: float,
     log_level: str,
     env: bool,
 ) -> None:
@@ -264,6 +278,8 @@ def main(
                 message_retry_count=meshcore_message_retry_count,
                 message_retry_delay=meshcore_message_retry_delay,
                 reset_path_on_failure=meshcore_reset_path_on_failure,
+                message_initial_delay=meshcore_message_initial_delay,
+                message_send_delay=meshcore_message_send_delay,
             )
 
             config = Config(

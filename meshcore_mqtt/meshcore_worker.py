@@ -82,6 +82,11 @@ class MeshCoreWorker:
         self._startup_time = time.time()
         self._startup_grace_period = 5.0  # 5 seconds to ignore commands during startup
 
+        # Message rate limiting
+        self._message_queue: asyncio.Queue[dict] = asyncio.Queue()
+        self._last_message_time: Optional[float] = None
+        self._rate_limit_task: Optional[asyncio.Task[None]] = None
+
     async def start(self) -> None:
         """Start the MeshCore worker."""
         if self._running:
@@ -108,6 +113,9 @@ class MeshCoreWorker:
                 asyncio.create_task(self._health_monitor(), name="meshcore_health"),
                 asyncio.create_task(
                     self._auto_fetch_monitor(), name="meshcore_autofetch"
+                ),
+                asyncio.create_task(
+                    self._message_rate_limiter(), name="meshcore_rate_limiter"
                 ),
             ]
             self._tasks.extend(tasks)
@@ -339,7 +347,9 @@ class MeshCoreWorker:
                         "send_msg requires 'destination' and 'message' fields"
                     )
                     return
-                result = await self._send_msg_with_retry(destination, msg_text)
+                result = await self._queue_rate_limited_command(
+                    command_type, command_data
+                )
 
             elif command_type == "device_query":
                 result = await self.meshcore.commands.send_device_query()
@@ -362,7 +372,9 @@ class MeshCoreWorker:
                         "send_chan_msg requires 'channel' and 'message' fields"
                     )
                     return
-                result = await self._send_chan_msg_with_retry(channel, msg_text)
+                result = await self._queue_rate_limited_command(
+                    command_type, command_data
+                )
 
             elif command_type == "send_advert":
                 flood = command_data.get("flood", False)
@@ -569,6 +581,147 @@ class MeshCoreWorker:
             except Exception as e:
                 self.logger.error(f"Error in auto-fetch monitor: {e}")
                 await asyncio.sleep(60)
+
+    async def _message_rate_limiter(self) -> None:
+        """Rate-limited message processor to prevent network flooding."""
+        self.logger.info("Starting message rate limiter")
+
+        while self._running:
+            try:
+                # Get next message from the queue (with timeout to allow shutdown)
+                try:
+                    message_data = await asyncio.wait_for(
+                        self._message_queue.get(), timeout=1.0
+                    )
+                except asyncio.TimeoutError:
+                    continue
+
+                # Apply rate limiting delays
+                current_time = time.time()
+
+                # Apply initial delay for the first message
+                if self._last_message_time is None:
+                    if self.config.meshcore.message_initial_delay > 0:
+                        self.logger.debug(
+                            f"Applying initial delay of "
+                            f"{self.config.meshcore.message_initial_delay}s "
+                            f"before first message"
+                        )
+                        await asyncio.sleep(self.config.meshcore.message_initial_delay)
+                else:
+                    # Apply delay between consecutive messages
+                    time_since_last = current_time - self._last_message_time
+                    required_delay = self.config.meshcore.message_send_delay
+
+                    if time_since_last < required_delay:
+                        sleep_time = required_delay - time_since_last
+                        self.logger.debug(
+                            f"Rate limiting: waiting {sleep_time:.1f}s "
+                            f"before next message"
+                        )
+                        await asyncio.sleep(sleep_time)
+
+                # Send the message
+                await self._execute_rate_limited_message(message_data)
+                self._last_message_time = time.time()
+
+            except Exception as e:
+                self.logger.error(f"Error in message rate limiter: {e}")
+                await asyncio.sleep(1)
+
+    async def _queue_rate_limited_command(
+        self, command_type: str, command_data: dict
+    ) -> Any:
+        """Queue a command for rate-limited execution."""
+        self.logger.info(f"Queueing rate-limited command: {command_type}")
+
+        # Create a future to track the result
+        future: asyncio.Future[Any] = asyncio.Future()
+
+        # Prepare message data for the queue
+        message_data = {
+            "command_type": command_type,
+            "future": future,
+            **command_data,  # Include all command data
+        }
+
+        # Add to the rate-limiting queue
+        await self._message_queue.put(message_data)
+
+        # Wait for the result
+        try:
+            result = await future
+            return result
+        except Exception as e:
+            self.logger.error(f"Rate-limited command '{command_type}' failed: {e}")
+            raise
+
+    async def _execute_rate_limited_message(self, message_data: dict) -> None:
+        """Execute a rate-limited message send operation."""
+        command_type = message_data.get("command_type")
+        future: Optional[asyncio.Future[Any]] = message_data.get("future")
+
+        try:
+            result = None
+
+            if not self.meshcore:
+                raise RuntimeError("MeshCore not initialized")
+
+            if command_type == "send_msg":
+                destination = message_data.get("destination")
+                msg_text = message_data.get("message", "")
+                if not isinstance(destination, str) or not isinstance(msg_text, str):
+                    raise ValueError("Invalid destination or message type")
+                result = await self._send_msg_with_retry(destination, msg_text)
+
+            elif command_type == "send_chan_msg":
+                channel = message_data.get("channel")
+                msg_text = message_data.get("message", "")
+                if not isinstance(channel, int) or not isinstance(msg_text, str):
+                    raise ValueError("Invalid channel or message type")
+                result = await self._send_chan_msg_with_retry(channel, msg_text)
+
+            elif command_type == "device_query":
+                result = await self.meshcore.commands.send_device_query()
+
+            elif command_type == "get_battery":
+                result = await self.meshcore.commands.get_bat()
+
+            elif command_type == "set_name":
+                name = message_data.get("name", "")
+                if not isinstance(name, str):
+                    raise ValueError("Invalid name type")
+                result = await self.meshcore.commands.set_name(name)
+
+            elif command_type == "send_advert":
+                flood = message_data.get("flood", False)
+                result = await self.meshcore.commands.send_advert(flood=flood)
+
+            elif command_type == "send_trace":
+                auth_code = message_data.get("auth_code", 0)
+                tag = message_data.get("tag")
+                flags = message_data.get("flags", 0)
+                path = message_data.get("path")
+                result = await self.meshcore.commands.send_trace(
+                    auth_code=auth_code, tag=tag, flags=flags, path=path
+                )
+
+            elif command_type == "send_telemetry_req":
+                destination = message_data.get("destination")
+                if not isinstance(destination, str):
+                    raise ValueError("Invalid destination type")
+                result = await self.meshcore.commands.send_telemetry_req(destination)
+
+            # Set the result on the future
+            if future and not future.done():
+                future.set_result(result)
+
+        except Exception as e:
+            self.logger.error(
+                f"Error executing rate-limited command '{command_type}': {e}"
+            )
+            if future and not future.done():
+                future.set_exception(e)
 
     async def _recover_connection(self) -> None:
         """Recover MeshCore connection."""

@@ -111,6 +111,18 @@ class MeshCoreConfig(BaseModel):
         default=True,
         description="Reset routing path after max retries and try once more",
     )
+    message_initial_delay: float = Field(
+        default=5.0,
+        ge=0.0,
+        le=60.0,
+        description="Initial delay in seconds before sending the first message",
+    )
+    message_send_delay: float = Field(
+        default=10.0,
+        ge=0.0,
+        le=60.0,
+        description="Delay in seconds between consecutive message sends",
+    )
 
     @field_validator("port")
     @classmethod
@@ -260,6 +272,10 @@ class Config(BaseModel):
                 "MESHCORE_RESET_PATH_ON_FAILURE", "true"
             ).lower()
             == "true",
+            message_initial_delay=float(
+                os.getenv("MESHCORE_MESSAGE_INITIAL_DELAY", "5.0")
+            ),
+            message_send_delay=float(os.getenv("MESHCORE_MESSAGE_SEND_DELAY", "10.0")),
         )
 
         return cls(

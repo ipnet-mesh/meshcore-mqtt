@@ -8,7 +8,6 @@
 [![Docker Build and Push](https://github.com/ipnet-mesh/meshcore-mqtt/actions/workflows/docker-build.yml/badge.svg)](https://github.com/ipnet-mesh/meshcore-mqtt/actions/workflows/docker-build.yml)
 [![Code style: black](https://img.shields.io/badge/Code%20style-black-000000.svg)](https://github.com/psf/black)
 [![Typing: mypy](https://img.shields.io/badge/Typing-mypy-blue.svg)](https://mypy.readthedocs.io/)
-[![Security: bandit](https://img.shields.io/badge/Security-bandit-yellow.svg)](https://github.com/PyCQA/bandit)
 
 A robust bridge service that connects MeshCore devices to MQTT brokers, enabling seamless integration with IoT platforms and message processing systems.
 
