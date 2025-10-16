@@ -1150,9 +1150,14 @@ class MeshCoreWorker:
         )
         return None
 
-    async def _wait_for_ack(self, expected_ack: str, timeout: float) -> bool:
+    async def _wait_for_ack(self, expected_ack: "str | bytes", timeout: float) -> bool:
         """Wait for acknowledgement with timeout."""
-        ack_key = str(expected_ack)
+        # Normalize expected_ack to hex string if it's bytes
+        if isinstance(expected_ack, bytes):
+            ack_key = expected_ack.hex()
+        else:
+            ack_key = str(expected_ack)
+
         event = asyncio.Event()
         self._pending_acks[ack_key] = event
 
@@ -1176,9 +1181,13 @@ class MeshCoreWorker:
             ack_id = None
             if hasattr(ack_data, "payload"):
                 if isinstance(ack_data.payload, dict):
-                    ack_id = ack_data.payload.get("ack") or ack_data.payload.get(
-                        "ack_id"
+                    ack_id = (
+                        ack_data.payload.get("code")
+                        or ack_data.payload.get("ack")
+                        or ack_data.payload.get("ack_id")
                     )
+                elif hasattr(ack_data.payload, "code"):
+                    ack_id = ack_data.payload.code
                 elif hasattr(ack_data.payload, "ack"):
                     ack_id = ack_data.payload.ack
 
