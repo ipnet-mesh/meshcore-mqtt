@@ -1,6 +1,6 @@
-# MeshCore MQTT Bridge - Claude Context
+# MeshCore MQTT Bridge - OpenCode Context
 
-## Instructions for Claude
+## Instructions for OpenCode
 
 - Run `pre-commit run --all-files` to ensure code quality and tests pass after making changes.
 - Activate and use Python virtual environment located at `./venv` before any development or running commands.
@@ -396,7 +396,7 @@ def validate_field(cls, v: Type) -> Type:
     return v
 ```
 
-## Important Notes for Claude
+## Important Notes for OpenCode
 
 ### When Making Changes
 
