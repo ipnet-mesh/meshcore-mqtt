@@ -108,6 +108,31 @@ The bridge includes configurable message rate limiting to prevent network floodi
   - `--meshcore-message-initial-delay 15.0`
   - `--meshcore-message-send-delay 15.0`
 
+### Guest Password Support for Telemetry Requests
+
+The bridge supports requesting telemetry from repeaters that require guest password authentication:
+
+**Two-Step Authentication Process**:
+1. **Login**: Use `send_login` command with destination and password
+2. **Request Telemetry**: Use `send_telemetry_req` command (with or without password)
+
+**Automatic Login Feature**:
+- When `send_telemetry_req` includes a `password` field, the bridge automatically:
+  1. Logs into the repeater using `send_login(destination, password)`
+  2. Then requests telemetry using `send_telemetry_req(destination)`
+- This simplifies the workflow for one-time telemetry requests
+
+**Manual Session Management**:
+For more control over the authentication session:
+1. Use `send_login` to establish the session
+2. Use `send_telemetry_req` (without password) for multiple requests
+3. Use `send_logoff` to terminate the session when done
+
+**Use Cases**:
+- **Automatic**: Single telemetry request with password
+- **Manual**: Multiple telemetry requests during one session
+- **Session Control**: Explicit login/logout for resource management
+
 ### MQTT Topics
 
 The bridge publishes to structured MQTT topics:
@@ -146,7 +171,9 @@ The bridge supports bidirectional communication via MQTT commands. Send commands
 | `set_name` | Set device name | `name` | `meshcore.commands.set_name()` |
 | `send_advert` | Send device advertisement | None (optional: `flood`) | `meshcore.commands.send_advert()` |
 | `send_trace` | Send trace packet for routing diagnostics | None (optional: `auth_code`, `tag`, `flags`, `path`) | `meshcore.commands.send_trace()` |
-| `send_telemetry_req` | Request telemetry data from a node | `destination` | `meshcore.commands.send_telemetry_req()` |
+| `send_telemetry_req` | Request telemetry data from a node | `destination` (optional: `password`) | `meshcore.commands.send_telemetry_req()` |
+| `send_login` | Login to a repeater with guest password | `destination`, `password` | `meshcore.commands.send_login()` |
+| `send_logoff` | Logoff from a repeater | `destination` | `meshcore.commands.send_logoff()` |
 
 **Command Examples**:
 ```json
@@ -176,6 +203,18 @@ The bridge supports bidirectional communication via MQTT commands. Send commands
 
 // Send trace packet with parameters
 {"auth_code": 12345, "tag": 67890, "flags": 1, "path": "23,5f,3a"}
+
+// Request telemetry data (without password)
+{"destination": "node123"}
+
+// Request telemetry data (with guest password)
+{"destination": "repeater_node", "password": "guest_password"}
+
+// Login to repeater with guest password
+{"destination": "repeater_node", "password": "guest_password"}
+
+// Logoff from repeater
+{"destination": "repeater_node"}
 ```
 
 **Command Examples**:
@@ -215,6 +254,18 @@ mosquitto_pub -h localhost -t "meshcore/command/send_trace" \
 # Request telemetry data from a node
 mosquitto_pub -h localhost -t "meshcore/command/send_telemetry_req" \
   -m '{"destination": "node123"}'
+
+# Request telemetry data from repeater with guest password
+mosquitto_pub -h localhost -t "meshcore/command/send_telemetry_req" \
+  -m '{"destination": "repeater_node", "password": "guest_password"}'
+
+# Login to repeater with guest password
+mosquitto_pub -h localhost -t "meshcore/command/send_login" \
+  -m '{"destination": "repeater_node", "password": "guest_password"}'
+
+# Logoff from repeater
+mosquitto_pub -h localhost -t "meshcore/command/send_logoff" \
+  -m '{"destination": "repeater_node"}'
 ```
 
 ## Development Guidelines

@@ -404,6 +404,27 @@ class MeshCoreWorker:
                     command_type, command_data
                 )
 
+            elif command_type == "send_login":
+                destination = command_data.get("destination")
+                password = command_data.get("password")
+                if not destination or not password:
+                    self.logger.error(
+                        "send_login requires 'destination' and 'password' fields"
+                    )
+                    return
+                result = await self._queue_rate_limited_command(
+                    command_type, command_data
+                )
+
+            elif command_type == "send_logoff":
+                destination = command_data.get("destination")
+                if not destination:
+                    self.logger.error("send_logoff requires 'destination' field")
+                    return
+                result = await self._queue_rate_limited_command(
+                    command_type, command_data
+                )
+
             else:
                 self.logger.warning(f"Unknown command type: {command_type}")
                 return
@@ -755,11 +776,54 @@ class MeshCoreWorker:
 
             elif command_type == "send_telemetry_req":
                 destination = message_data.get("destination")
+                password = message_data.get("password")
+                if not isinstance(destination, str):
+                    raise ValueError("Invalid destination type")
+
+                # If password is provided, login first then request telemetry
+                if password:
+                    if not isinstance(password, str):
+                        raise ValueError("Invalid password type")
+                    # Login first
+                    await self._rate_limited_send(
+                        f"send_login({destination})",
+                        self.meshcore.commands.send_login,
+                        destination,
+                        password,
+                    )
+                    # Then request telemetry
+                    result = await self._rate_limited_send(
+                        f"send_telemetry_req({destination})",
+                        self.meshcore.commands.send_telemetry_req,
+                        destination,
+                    )
+                else:
+                    # No password, just request telemetry directly
+                    result = await self._rate_limited_send(
+                        f"send_telemetry_req({destination})",
+                        self.meshcore.commands.send_telemetry_req,
+                        destination,
+                    )
+
+            elif command_type == "send_login":
+                destination = message_data.get("destination")
+                password = message_data.get("password")
+                if not isinstance(destination, str) or not isinstance(password, str):
+                    raise ValueError("Invalid destination or password type")
+                result = await self._rate_limited_send(
+                    f"send_login({destination})",
+                    self.meshcore.commands.send_login,
+                    destination,
+                    password,
+                )
+
+            elif command_type == "send_logoff":
+                destination = message_data.get("destination")
                 if not isinstance(destination, str):
                     raise ValueError("Invalid destination type")
                 result = await self._rate_limited_send(
-                    f"send_telemetry_req({destination})",
-                    self.meshcore.commands.send_telemetry_req,
+                    f"send_logoff({destination})",
+                    self.meshcore.commands.send_logoff,
                     destination,
                 )
 
