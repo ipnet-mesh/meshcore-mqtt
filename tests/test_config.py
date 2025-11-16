@@ -110,11 +110,11 @@ class TestMeshCoreConfig:
     def test_valid_tcp_config(self) -> None:
         """Test valid TCP configuration."""
         config = MeshCoreConfig(
-            connection_type=ConnectionType.TCP, address="192.168.1.100", port=12345
+            connection_type=ConnectionType.TCP, address="192.168.1.100", port=5000
         )
         assert config.connection_type == ConnectionType.TCP
         assert config.address == "192.168.1.100"
-        assert config.port == 12345
+        assert config.port == 5000
         assert config.timeout == 5
 
     def test_valid_serial_config(self) -> None:
@@ -142,7 +142,7 @@ class TestMeshCoreConfig:
         config = MeshCoreConfig(
             connection_type=ConnectionType.TCP, address="192.168.1.100", port=None
         )
-        assert config.port == 12345
+        assert config.port == 5000
 
     def test_custom_baudrate(self) -> None:
         """Test custom baudrate for serial connections."""

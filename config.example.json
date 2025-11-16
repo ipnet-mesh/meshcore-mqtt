@@ -11,7 +11,7 @@
   "meshcore": {
     "connection_type": "tcp",
     "address": "192.168.1.100",
-    "port": 12345,
+    "port": 5000,
     "baudrate": 115200,
     "timeout": 5,
     "auto_fetch_restart_delay": 5,

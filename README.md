@@ -65,7 +65,7 @@ The bridge supports multiple configuration methods with the following precedence
 #### MeshCore Settings
 - `meshcore_connection`: Connection type (serial, ble, tcp)
 - `meshcore_address`: Device address (required)
-- `meshcore_port`: Device port for TCP connections (default: 12345)
+- `meshcore_port`: Device port for TCP connections (default: 5000)
 - `meshcore_baudrate`: Baudrate for serial connections (default: 115200)
 - `meshcore_timeout`: Operation timeout in seconds (default: 5)
 - `meshcore_auto_fetch_restart_delay`: Delay in seconds before restarting auto-fetch after NO_MORE_MSGS (default: 5, range: 1-60)
@@ -93,7 +93,7 @@ The bridge supports multiple configuration methods with the following precedence
   "meshcore": {
     "connection_type": "tcp",
     "address": "192.168.1.100",
-    "port": 12345,
+    "port": 5000,
     "baudrate": 115200,
     "timeout": 10,
     "auto_fetch_restart_delay": 10,
@@ -126,7 +126,7 @@ mqtt:
 meshcore:
   connection_type: tcp
   address: "192.168.1.100"
-  port: 12345
+  port: 5000
   baudrate: 115200
   timeout: 10
   auto_fetch_restart_delay: 10
@@ -151,7 +151,7 @@ export MQTT_USERNAME=myuser
 export MQTT_PASSWORD=mypass
 export MESHCORE_CONNECTION=tcp
 export MESHCORE_ADDRESS=192.168.1.100
-export MESHCORE_PORT=12345
+export MESHCORE_PORT=5000
 export MESHCORE_BAUDRATE=115200
 export MESHCORE_AUTO_FETCH_RESTART_DELAY=10
 export MESHCORE_MESSAGE_INITIAL_DELAY=15.0
@@ -177,7 +177,7 @@ python -m meshcore_mqtt.main \
   --mqtt-password mypass \
   --meshcore-connection tcp \
   --meshcore-address 192.168.1.100 \
-  --meshcore-port 12345 \
+  --meshcore-port 5000 \
   --meshcore-auto-fetch-restart-delay 10 \
   --meshcore-events "CONNECTED,DISCONNECTED,BATTERY"
 ```
@@ -195,7 +195,7 @@ python -m meshcore_mqtt.main \
   --mqtt-broker localhost \
   --meshcore-connection tcp \
   --meshcore-address 192.168.1.100 \
-  --meshcore-port 12345
+  --meshcore-port 5000
 ```
 
 #### Serial Connection
@@ -552,7 +552,7 @@ MQTT_TLS_INSECURE=false
 MESHCORE_CONNECTION=serial
 MESHCORE_ADDRESS=/dev/ttyUSB0    # Serial port, IP address, or BLE MAC address
 MESHCORE_BAUDRATE=115200         # For serial connections
-MESHCORE_PORT=4403              # Only for TCP connections
+MESHCORE_PORT=5000              # Only for TCP connections
 MESHCORE_TIMEOUT=30
 MESHCORE_AUTO_FETCH_RESTART_DELAY=10  # Restart delay after NO_MORE_MSGS (1-60 seconds)
 MESHCORE_MESSAGE_INITIAL_DELAY=15.0    # Initial delay before first message (0.0-60.0 seconds)
@@ -576,7 +576,7 @@ MESHCORE_BAUDRATE=115200
 ```bash
 MESHCORE_CONNECTION=tcp
 MESHCORE_ADDRESS=192.168.1.100
-MESHCORE_PORT=4403
+MESHCORE_PORT=5000
 ```
 
 **BLE Connection:**

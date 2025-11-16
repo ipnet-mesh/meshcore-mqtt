@@ -19,7 +19,7 @@ def test_config() -> Config:
         meshcore=MeshCoreConfig(
             connection_type=ConnectionType.TCP,
             address="127.0.0.1",
-            port=12345,
+            port=5000,
             message_initial_delay=0.1,  # 100ms for faster tests
             message_send_delay=0.2,  # 200ms for faster tests
         ),
@@ -34,7 +34,7 @@ def test_config_zero_delays() -> Config:
         meshcore=MeshCoreConfig(
             connection_type=ConnectionType.TCP,
             address="127.0.0.1",
-            port=12345,
+            port=5000,
             message_initial_delay=0.0,
             message_send_delay=0.0,
         ),

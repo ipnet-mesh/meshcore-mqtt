@@ -133,7 +133,7 @@ class MeshCoreConfig(BaseModel):
 
         # Set default port for TCP if None provided
         if connection_type == ConnectionType.TCP and v is None:
-            v = 12345
+            v = 5000
 
         if v is not None and not 1 <= v <= 65535:
             raise ValueError("Port must be between 1 and 65535")
@@ -252,7 +252,7 @@ class Config(BaseModel):
             connection_type=ConnectionType(os.getenv("MESHCORE_CONNECTION", "tcp")),
             address=os.getenv("MESHCORE_ADDRESS", ""),
             port=(
-                int(os.getenv("MESHCORE_PORT", "12345"))
+                int(os.getenv("MESHCORE_PORT", "5000"))
                 if os.getenv("MESHCORE_PORT")
                 else None
             ),
