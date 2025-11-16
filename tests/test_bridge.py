@@ -20,7 +20,7 @@ def test_config() -> Config:
         meshcore=MeshCoreConfig(
             connection_type=ConnectionType.TCP,
             address="127.0.0.1",
-            port=12345,
+            port=5000,
         ),
     )
 
@@ -60,7 +60,7 @@ class TestBridgeCoordinator:
         bridge = BridgeCoordinator(test_config)
         assert bridge.config.meshcore.connection_type == ConnectionType.TCP
         assert bridge.config.meshcore.address == "127.0.0.1"
-        assert bridge.config.meshcore.port == 12345
+        assert bridge.config.meshcore.port == 5000
 
     def test_serial_connection_config(self) -> None:
         """Test serial connection configuration."""
